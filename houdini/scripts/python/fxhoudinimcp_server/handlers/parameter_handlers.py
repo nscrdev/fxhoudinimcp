@@ -27,13 +27,20 @@ def _resolve_node(node_path: str) -> hou.Node:
     return node
 
 
+def _available_parm_names(node: hou.Node) -> list[str]:
+    """Return sorted list of parameter names on a node."""
+    return sorted(p.name() for p in node.parms())
+
+
 def _resolve_parm(node_path: str, parm_name: str) -> hou.Parm:
     """Return the hou.Parm on *node_path* named *parm_name* or raise."""
     node = _resolve_node(node_path)
     parm = node.parm(parm_name)
     if parm is None:
+        available = _available_parm_names(node)
         raise ValueError(
-            f"Parameter '{parm_name}' not found on node '{node_path}'"
+            f"Parameter '{parm_name}' not found on node '{node_path}'. "
+            f"Available parameters: {available}"
         )
     return parm
 
@@ -241,9 +248,11 @@ def _get_parameter_schema(
     if parm_name is not None:
         parm = node.parm(parm_name)
         if parm is None:
-            raise ValueError(
-                f"Parameter '{parm_name}' not found on node '{node_path}'"
-            )
+            return {
+                "node_path": node_path,
+                "error": f"Parameter '{parm_name}' not found",
+                "available_parameters": _available_parm_names(node),
+            }
         return {
             "node_path": node_path,
             "parameter": _template_to_dict(parm.parmTemplate()),

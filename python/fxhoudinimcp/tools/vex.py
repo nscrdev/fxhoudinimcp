@@ -26,6 +26,8 @@ async def create_wrangle(
 ) -> dict:
     """Create an Attribute Wrangle node with VEX code.
 
+    Preferred over execute_python for all geometry manipulation.
+
     Args:
         parent_path: Parent SOP network path.
         vex_code: VEX snippet to set.

@@ -9,6 +9,7 @@ from __future__ import annotations
 # Built-in
 import io
 import sys
+import traceback
 from typing import Any
 
 # Third-party
@@ -72,19 +73,49 @@ def _execute_python(
     old_stdout, old_stderr = sys.stdout, sys.stderr
     sys.stdout, sys.stderr = stdout_buf, stderr_buf
 
+    exec_error: str | None = None
     try:
         exec(code, namespace)  # noqa: S102
+    except Exception:
+        exec_error = traceback.format_exc()
     finally:
         sys.stdout, sys.stderr = old_stdout, old_stderr
-
-    result: Any = None
-    if return_expression is not None:
-        result = eval(return_expression, namespace)  # noqa: S307
 
     stdout_text = _truncate_output(stdout_buf.getvalue())
     stderr_text = _truncate_output(stderr_buf.getvalue())
 
-    response: dict[str, Any] = {
+    if exec_error:
+        response: dict[str, Any] = {
+            "executed": False,
+            "error": exec_error,
+        }
+        if stdout_text:
+            response["stdout"] = stdout_text
+        if stderr_text:
+            response["stderr"] = stderr_text
+        return response
+
+    result: Any = None
+    eval_error: str | None = None
+    if return_expression is not None:
+        try:
+            result = eval(return_expression, namespace)  # noqa: S307
+        except Exception:
+            eval_error = traceback.format_exc()
+
+    if eval_error:
+        response = {
+            "executed": True,
+            "return_value": None,
+            "eval_error": eval_error,
+        }
+        if stdout_text:
+            response["stdout"] = stdout_text
+        if stderr_text:
+            response["stderr"] = stderr_text
+        return response
+
+    response = {
         "executed": True,
         "return_value": _serialize_result(result),
     }

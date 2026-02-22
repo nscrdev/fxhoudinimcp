@@ -23,7 +23,9 @@ from fxhoudinimcp.server import mcp, _get_bridge
 async def execute_python(
     ctx: Context, code: str, return_expression: str | None = None
 ) -> dict:
-    """Execute Python code inside Houdini's interpreter.
+    """Execute Python code inside Houdini for scene-level scripting only.
+
+    Use create_node/create_wrangle for geometry work instead.
 
     Args:
         code: Python source code to execute.

@@ -150,12 +150,14 @@ def set_viewport_display(
     mode_map = {
         "wireframe": hou.glShadingType.Wire,
         "wire": hou.glShadingType.Wire,
-        "shaded": hou.glShadingType.SmoothShaded,
-        "smooth": hou.glShadingType.SmoothShaded,
+        "shaded": hou.glShadingType.Smooth,
+        "smooth": hou.glShadingType.Smooth,
         "smooth_wire": hou.glShadingType.SmoothWire,
         "hidden_line": hou.glShadingType.HiddenLineGhost,
-        "flat": hou.glShadingType.FlatShaded,
+        "flat": hou.glShadingType.Flat,
         "flat_wire": hou.glShadingType.FlatWire,
+        "matcap": hou.glShadingType.MatCap,
+        "matcap_wire": hou.glShadingType.MatCapWire,
     }
 
     gl_mode = mode_map.get(display_mode.lower())

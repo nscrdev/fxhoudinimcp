@@ -72,7 +72,7 @@ async def set_viewport_display(
 
     Args:
         display_mode: One of 'wireframe', 'shaded', 'smooth', 'smooth_wire',
-            'hidden_line', 'flat', 'flat_wire'.
+            'hidden_line', 'flat', 'flat_wire', 'matcap', 'matcap_wire'.
         pane_name: Pane tab name.
     """
     bridge = _get_bridge(ctx)
