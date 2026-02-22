@@ -1,0 +1,165 @@
+"""Tests for the HTTP bridge to Houdini."""
+
+from __future__ import annotations
+
+# Built-in
+from unittest.mock import AsyncMock, MagicMock, patch
+
+# Third-party
+import httpx
+import pytest
+
+# Internal
+from fxhoudinimcp.bridge import HoudiniBridge
+from fxhoudinimcp.errors import ConnectionError, HoudiniCommandError
+
+
+class TestHoudiniBridgeInit:
+    def test_default_url(self):
+        bridge = HoudiniBridge()
+        assert bridge.base_url == "http://localhost:8100"
+        assert bridge._api_url == "http://localhost:8100/api"
+
+    def test_custom_host_port(self):
+        bridge = HoudiniBridge(host="10.0.0.1", port=9090)
+        assert bridge.base_url == "http://10.0.0.1:9090"
+
+
+class TestExecute:
+    @pytest.fixture
+    def bridge(self):
+        return HoudiniBridge()
+
+    @pytest.fixture
+    def mock_response(self):
+        """A factory for mock httpx.Response objects."""
+        def _make(json_data, status_code=200):
+            resp = MagicMock(spec=httpx.Response)
+            resp.json.return_value = json_data
+            resp.status_code = status_code
+            resp.raise_for_status = MagicMock()
+            if status_code >= 400:
+                resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+                    "error", request=MagicMock(), response=resp
+                )
+                resp.text = str(json_data)
+            return resp
+        return _make
+
+    @pytest.mark.asyncio
+    async def test_success(self, bridge, mock_response):
+        resp = mock_response({"status": "success", "data": {"key": "val"}, "timing_ms": 5.0})
+        with patch.object(bridge, "_get_client") as mock_client:
+            client = AsyncMock()
+            client.post = AsyncMock(return_value=resp)
+            mock_client.return_value = client
+
+            result = await bridge.execute("scene.get_info")
+            assert result == {"key": "val"}
+            client.post.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_houdini_error_raises_command_error(self, bridge, mock_response):
+        resp = mock_response({
+            "status": "error",
+            "error": {"code": "NODE_NOT_FOUND", "message": "Node not found: /bad"},
+        })
+        with patch.object(bridge, "_get_client") as mock_client:
+            client = AsyncMock()
+            client.post = AsyncMock(return_value=resp)
+            mock_client.return_value = client
+
+            with pytest.raises(HoudiniCommandError) as exc_info:
+                await bridge.execute("nodes.get_info", {"path": "/bad"})
+            assert exc_info.value.code == "NODE_NOT_FOUND"
+
+    @pytest.mark.asyncio
+    async def test_connect_error(self, bridge):
+        with patch.object(bridge, "_get_client") as mock_client:
+            client = AsyncMock()
+            client.post = AsyncMock(side_effect=httpx.ConnectError("refused"))
+            mock_client.return_value = client
+
+            with pytest.raises(ConnectionError):
+                await bridge.execute("scene.get_info")
+
+    @pytest.mark.asyncio
+    async def test_timeout_error(self, bridge):
+        with patch.object(bridge, "_get_client") as mock_client:
+            client = AsyncMock()
+            client.post = AsyncMock(side_effect=httpx.ReadTimeout("timeout"))
+            mock_client.return_value = client
+
+            with pytest.raises(ConnectionError) as exc_info:
+                await bridge.execute("scene.get_info")
+            assert "timed out" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_http_status_error(self, bridge, mock_response):
+        resp = mock_response({"error": "server error"}, status_code=500)
+        with patch.object(bridge, "_get_client") as mock_client:
+            client = AsyncMock()
+            client.post = AsyncMock(return_value=resp)
+            mock_client.return_value = client
+
+            with pytest.raises(ConnectionError) as exc_info:
+                await bridge.execute("scene.get_info")
+            assert "500" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_raw_result_fallback(self, bridge, mock_response):
+        """When response isn't wrapped in status/data, return it directly."""
+        resp = mock_response({"directly": "returned"})
+        with patch.object(bridge, "_get_client") as mock_client:
+            client = AsyncMock()
+            client.post = AsyncMock(return_value=resp)
+            mock_client.return_value = client
+
+            result = await bridge.execute("some.command")
+            assert result == {"directly": "returned"}
+
+
+class TestHealthCheck:
+    @pytest.mark.asyncio
+    async def test_success(self):
+        bridge = HoudiniBridge()
+        resp = MagicMock(spec=httpx.Response)
+        resp.json.return_value = {"status": "ok", "houdini_version": "21.0.440"}
+        resp.raise_for_status = MagicMock()
+
+        with patch.object(bridge, "_get_client") as mock_client:
+            client = AsyncMock()
+            client.post = AsyncMock(return_value=resp)
+            mock_client.return_value = client
+
+            result = await bridge.health_check()
+            assert result["houdini_version"] == "21.0.440"
+
+    @pytest.mark.asyncio
+    async def test_failure_raises_connection_error(self):
+        bridge = HoudiniBridge()
+        with patch.object(bridge, "_get_client") as mock_client:
+            client = AsyncMock()
+            client.post = AsyncMock(side_effect=httpx.ConnectError("refused"))
+            mock_client.return_value = client
+
+            with pytest.raises(ConnectionError):
+                await bridge.health_check()
+
+
+class TestClose:
+    @pytest.mark.asyncio
+    async def test_close_with_client(self):
+        bridge = HoudiniBridge()
+        mock_client = AsyncMock()
+        mock_client.is_closed = False
+        bridge._client = mock_client
+
+        await bridge.close()
+        mock_client.aclose.assert_called_once()
+        assert bridge._client is None
+
+    @pytest.mark.asyncio
+    async def test_close_without_client(self):
+        bridge = HoudiniBridge()
+        await bridge.close()  # should not raise

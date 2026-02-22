@@ -1,0 +1,197 @@
+# This workflow handles the complete release process:
+# 1. Generate changelog from conventional commits
+# 2. Create a GitHub release with changelog content
+# 3. Build and publish Python package to PyPI
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      node-version:
+        description: "Node.js version to use for changelog generation"
+        type: string
+        default: "20"
+      python-version:
+        description: "Python version to use for build and documentation"
+        type: string
+        default: "3.11"
+      skip-changelog:
+        description: "Skip changelog generation"
+        type: boolean
+        default: false
+      skip-pypi:
+        description: "Skip PyPI publishing"
+        type: boolean
+        default: false
+    secrets:
+      PIPY_USERNAME:
+        description: "PyPI username for package publishing"
+        required: false
+      PIPY_API_TOKEN:
+        description: "PyPI API token for package publishing"
+        required: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  # Step 1: Generate changelog FIRST so it can be included in the release
+  generate-changelog:
+    name: Generate Changelog
+    if: ${{ inputs.skip-changelog != true }}
+    runs-on: ubuntu-latest
+    outputs:
+      changelog-section: ${{ steps.extract-changelog.outputs.section }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Check for package.json
+        id: check-npm
+        run: |
+          if [ -f "package.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "No package.json found, skipping changelog generation"
+          fi
+
+      - name: Setup Node.js
+        if: steps.check-npm.outputs.exists == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version || '20' }}
+
+      - name: Install dependencies
+        if: steps.check-npm.outputs.exists == 'true'
+        run: npm install && npm install -g auto-changelog
+
+      - name: Generate changelog
+        if: steps.check-npm.outputs.exists == 'true'
+        run: npm run changelog
+
+      - name: Extract changelog section for this release
+        id: extract-changelog
+        run: |
+          TAG_NAME="${GITHUB_REF_NAME:-$(git describe --tags --abbrev=0)}"
+          VERSION="${TAG_NAME#v}"
+
+          if [ ! -f "CHANGELOG.md" ]; then
+            echo "section=No changelog available for this release." >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Looking for version: ${VERSION} (tag: ${TAG_NAME})"
+
+          # Try multiple patterns to find the version section
+          SECTION=$(awk "/^## \[v?${VERSION}\]/{found=1; next} /^## /{if(found) exit} found{print}" CHANGELOG.md)
+          SECTION=$(echo "$SECTION" | sed '/^[[:space:]]*$/d' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+          if [ -z "$SECTION" ]; then
+            SECTION=$(awk "/^## \[${TAG_NAME}\]/{found=1; next} /^## /{if(found) exit} found{print}" CHANGELOG.md)
+            SECTION=$(echo "$SECTION" | sed '/^[[:space:]]*$/d' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          fi
+
+          if [ -z "$SECTION" ]; then
+            SECTION=$(awk "/^## v?${VERSION}/{found=1; next} /^## /{if(found) exit} found{print}" CHANGELOG.md)
+            SECTION=$(echo "$SECTION" | sed '/^[[:space:]]*$/d' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          fi
+
+          if [ -z "$SECTION" ]; then
+            if grep -q "## \[v\?${VERSION}\]" CHANGELOG.md || grep -q "## v\?${VERSION}" CHANGELOG.md; then
+              SECTION="This release contains minor updates. See commit history for details."
+            else
+              SECTION="No changelog entry found for version ${VERSION}."
+            fi
+          fi
+
+          echo "section<<EOF" >> $GITHUB_OUTPUT
+          echo "$SECTION" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Remove package-lock.json
+        if: steps.check-npm.outputs.exists == 'true'
+        run: rm -f package-lock.json
+
+      - name: Commit and push changelog
+        if: steps.check-npm.outputs.exists == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add CHANGELOG.md
+          if [ -n "$(git status --porcelain)" ]; then
+            git commit -m '[DOC] CHANGELOG' -m '[skip ci]'
+            git push origin main
+          else
+            echo "No changes to commit"
+          fi
+
+  # Step 2: Create release WITH changelog content
+  create-release:
+    name: Create GitHub Release
+    needs: generate-changelog
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: ${{ github.ref_name }}
+          body: |
+            ## What's Changed
+
+            ${{ needs.generate-changelog.outputs.changelog-section || 'No detailed changelog available for this release.' }}
+
+            ---
+            📄 **[View Full Changelog](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)**
+
+  # Step 3: Build and publish to PyPI
+  publish-pypi:
+    name: Publish to PyPI
+    needs: create-release
+    if: ${{ always() && !cancelled() && inputs.skip-pypi != true && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+          submodules: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version || '3.11' }}
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools wheel twine build
+
+      - name: Build package
+        run: |
+          python -m build
+
+      - name: Publish package to PyPI
+        env:
+          TWINE_USERNAME: ${{ secrets.PIPY_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PIPY_API_TOKEN }}
+        run: |
+          twine upload dist/*

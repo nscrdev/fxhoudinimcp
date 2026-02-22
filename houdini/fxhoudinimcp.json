@@ -1,0 +1,11 @@
+{
+    "env": [
+        {
+            "FXHOUDINIMCP": {
+                "value": "$HOUDINI_USER_PREF_DIR/fxhoudinimcp",
+                "method": "default"
+            }
+        }
+    ],
+    "path": "$FXHOUDINIMCP"
+}

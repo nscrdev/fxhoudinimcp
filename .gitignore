@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+.venv/
+venv/
+env/
+.env
+*.so
+*.dylib
+
+# Testing
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Node
+node_modules/
+package-lock.json
+
+# MkDocs
+site/
+
+# OS
+*.log
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+
+# AI tools
+.claude/
+.cursor/
+.aider*
+.copilot/

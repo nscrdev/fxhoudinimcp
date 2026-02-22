@@ -1,0 +1,88 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Get Current Git Tag",
+            "type": "shell",
+            "command": "powershell -ExecutionPolicy Bypass -File ./.scripts/git/Get-CurrentGitTag.ps1",
+            "problemMatcher": [],
+            "group": {
+                "kind": "none",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Create and Push Git Tag",
+            "type": "shell",
+            "command": "powershell -ExecutionPolicy Bypass -File ./.scripts/git/Update-GitTag.ps1 ${input:incrementType}",
+            "problemMatcher": [],
+            "group": {
+                "kind": "none",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Deploy Documentation (MkDocs)",
+            "type": "shell",
+            "command": "python -m mkdocs gh-deploy",
+            "problemMatcher": [],
+            "group": {
+                "kind": "none",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Deploy Documentation (MkDocs, Local Preview)",
+            "type": "shell",
+            "command": "python -m mkdocs serve",
+            "problemMatcher": [],
+            "group": {
+                "kind": "none",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Generate Changelog",
+            "type": "shell",
+            "command": "npm install; npm run changelog",
+            "problemMatcher": [],
+            "group": {
+                "kind": "none",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            }
+        }
+    ],
+    "inputs": [
+        {
+            "id": "incrementType",
+            "type": "pickString",
+            "description": "Select the version increment type",
+            "options": [
+                "major",
+                "minor",
+                "patch"
+            ],
+            "default": "patch"
+        }
+    ]
+}
