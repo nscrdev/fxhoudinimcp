@@ -85,9 +85,12 @@ async def list_chop_channels(ctx: Context, node_path: str) -> dict:
         node_path: Path to the CHOP node (e.g. "/obj/chopnet1/wave1").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("chops.list_chop_channels", {
-        "node_path": node_path,
-    })
+    return await bridge.execute(
+        "chops.list_chop_channels",
+        {
+            "node_path": node_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -111,9 +114,12 @@ async def export_chop_to_parm(
         target_parm_name: Name of the parameter to set the expression on.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("chops.export_chop_to_parm", {
-        "chop_path": chop_path,
-        "channel_name": channel_name,
-        "target_node_path": target_node_path,
-        "target_parm_name": target_parm_name,
-    })
+    return await bridge.execute(
+        "chops.export_chop_to_parm",
+        {
+            "chop_path": chop_path,
+            "channel_name": channel_name,
+            "target_node_path": target_node_path,
+            "target_parm_name": target_parm_name,
+        },
+    )

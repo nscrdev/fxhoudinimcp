@@ -20,7 +20,9 @@ async def scene_info(ctx: Context) -> dict:
 async def node_info(path: str, ctx: Context) -> dict:
     """Information about a specific node at the given path."""
     bridge = _get_bridge(ctx)
-    return await bridge.execute("nodes.get_node_info", {"node_path": f"/{path}"})
+    return await bridge.execute(
+        "nodes.get_node_info", {"node_path": f"/{path}"}
+    )
 
 
 @mcp.resource("houdini://scene/tree")

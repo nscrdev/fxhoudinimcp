@@ -45,10 +45,13 @@ async def get_cop_geometry(
         output_index: Output connector index (default 0).
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("cops.get_cop_geometry", {
-        "node_path": node_path,
-        "output_index": output_index,
-    })
+    return await bridge.execute(
+        "cops.get_cop_geometry",
+        {
+            "node_path": node_path,
+            "output_index": output_index,
+        },
+    )
 
 
 @mcp.tool()
@@ -67,10 +70,13 @@ async def get_cop_layer(
         output_index: Output connector index (default 0).
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("cops.get_cop_layer", {
-        "node_path": node_path,
-        "output_index": output_index,
-    })
+    return await bridge.execute(
+        "cops.get_cop_layer",
+        {
+            "node_path": node_path,
+            "output_index": output_index,
+        },
+    )
 
 
 @mcp.tool()
@@ -163,7 +169,10 @@ async def get_cop_vdb(
         output_index: Output connector index (default 0).
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("cops.get_cop_vdb", {
-        "node_path": node_path,
-        "output_index": output_index,
-    })
+    return await bridge.execute(
+        "cops.get_cop_vdb",
+        {
+            "node_path": node_path,
+            "output_index": output_index,
+        },
+    )

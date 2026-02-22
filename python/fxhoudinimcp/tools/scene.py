@@ -36,7 +36,9 @@ async def new_scene(ctx: Context, save_current: bool = False) -> dict:
         save_current: If True, save the current scene before clearing it.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("scene.new_scene", {"save_current": save_current})
+    return await bridge.execute(
+        "scene.new_scene", {"save_current": save_current}
+    )
 
 
 @mcp.tool()
@@ -64,10 +66,13 @@ async def load_scene(ctx: Context, file_path: str, merge: bool = False) -> dict:
         merge: If True, merge the file into the current scene instead of replacing it.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("scene.load_scene", {
-        "file_path": file_path,
-        "merge": merge,
-    })
+    return await bridge.execute(
+        "scene.load_scene",
+        {
+            "file_path": file_path,
+            "merge": merge,
+        },
+    )
 
 
 @mcp.tool()

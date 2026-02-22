@@ -86,7 +86,9 @@ async def get_render_settings(ctx: Context, node_path: str) -> dict:
         node_path: Path to the ROP/Driver node (e.g. '/out/karma1').
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("rendering.get_render_settings", {"node_path": node_path})
+    return await bridge.execute(
+        "rendering.get_render_settings", {"node_path": node_path}
+    )
 
 
 @mcp.tool()
@@ -197,4 +199,6 @@ async def get_render_progress(ctx: Context, node_path: str) -> dict:
         node_path: Path to the ROP/Driver node (e.g. '/out/karma1').
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("rendering.get_render_progress", {"node_path": node_path})
+    return await bridge.execute(
+        "rendering.get_render_progress", {"node_path": node_path}
+    )

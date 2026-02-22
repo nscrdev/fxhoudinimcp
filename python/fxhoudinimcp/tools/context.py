@@ -35,10 +35,13 @@ async def get_network_overview(
         depth: How many levels deep to recurse into child networks (default: 2).
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("context.get_network_overview", {
-        "path": path,
-        "depth": depth,
-    })
+    return await bridge.execute(
+        "context.get_network_overview",
+        {
+            "path": path,
+            "depth": depth,
+        },
+    )
 
 
 @mcp.tool()
@@ -54,9 +57,12 @@ async def get_cook_chain(ctx: Context, node_path: str) -> dict:
         node_path: Absolute path to the target node (e.g. "/obj/geo1/mountain1").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("context.get_cook_chain", {
-        "node_path": node_path,
-    })
+    return await bridge.execute(
+        "context.get_cook_chain",
+        {
+            "node_path": node_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -72,9 +78,12 @@ async def explain_node(ctx: Context, node_path: str) -> dict:
         node_path: Absolute path to the node (e.g. "/obj/geo1/box1").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("context.explain_node", {
-        "node_path": node_path,
-    })
+    return await bridge.execute(
+        "context.explain_node",
+        {
+            "node_path": node_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -147,10 +156,13 @@ async def compare_snapshots(
         snapshot_name: Name of the snapshot (default: "default").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("context.compare_snapshots", {
-        "action": action,
-        "snapshot_name": snapshot_name,
-    })
+    return await bridge.execute(
+        "context.compare_snapshots",
+        {
+            "action": action,
+            "snapshot_name": snapshot_name,
+        },
+    )
 
 
 @mcp.tool()

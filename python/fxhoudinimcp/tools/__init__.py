@@ -1,7 +1,7 @@
 """MCP tool modules for FXHoudini-MCP.
 
 Importing this package registers all MCP tools with the FastMCP server.
-Each submodule uses the ``@mcp.tool()`` decorator at import time.
+Each submodule uses the `@mcp.tool()` decorator at import time.
 """
 
 from __future__ import annotations

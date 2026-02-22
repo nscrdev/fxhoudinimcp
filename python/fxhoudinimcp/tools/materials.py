@@ -31,9 +31,12 @@ async def list_materials(
         root_path: Root path to search for materials (default: "/mat").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("materials.list_materials", {
-        "root_path": root_path,
-    })
+    return await bridge.execute(
+        "materials.list_materials",
+        {
+            "root_path": root_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -49,9 +52,12 @@ async def get_material_info(ctx: Context, node_path: str) -> dict:
         node_path: Absolute path to the material node (e.g. "/mat/principledshader1").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("materials.get_material_info", {
-        "node_path": node_path,
-    })
+    return await bridge.execute(
+        "materials.get_material_info",
+        {
+            "node_path": node_path,
+        },
+    )
 
 
 @mcp.tool()

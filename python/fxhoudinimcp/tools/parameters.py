@@ -18,6 +18,7 @@ from fxhoudinimcp.server import mcp, _get_bridge
 
 ###### parameters.get_parameter
 
+
 @mcp.tool()
 async def get_parameter(ctx: Context, node_path: str, parm_name: str) -> dict:
     """Get the current value and metadata of a Houdini parameter.
@@ -37,6 +38,7 @@ async def get_parameter(ctx: Context, node_path: str, parm_name: str) -> dict:
 
 
 ###### parameters.set_parameter
+
 
 @mcp.tool()
 async def set_parameter(
@@ -61,6 +63,7 @@ async def set_parameter(
 
 ###### parameters.set_parameters
 
+
 @mcp.tool()
 async def set_parameters(
     ctx: Context, node_path: str, params: dict[str, Any]
@@ -82,6 +85,7 @@ async def set_parameters(
 
 
 ###### parameters.get_parameter_schema
+
 
 @mcp.tool()
 async def get_parameter_schema(
@@ -105,6 +109,7 @@ async def get_parameter_schema(
 
 
 ###### parameters.set_expression
+
 
 @mcp.tool()
 async def set_expression(
@@ -136,6 +141,7 @@ async def set_expression(
 
 ###### parameters.get_expression
 
+
 @mcp.tool()
 async def get_expression(ctx: Context, node_path: str, parm_name: str) -> dict:
     """Get the current expression on a Houdini parameter.
@@ -156,8 +162,11 @@ async def get_expression(ctx: Context, node_path: str, parm_name: str) -> dict:
 
 ###### parameters.revert_parameter
 
+
 @mcp.tool()
-async def revert_parameter(ctx: Context, node_path: str, parm_name: str) -> dict:
+async def revert_parameter(
+    ctx: Context, node_path: str, parm_name: str
+) -> dict:
     """Revert a Houdini parameter to its default value.
 
     Removes any expression or keyframes and restores the factory default.
@@ -174,6 +183,7 @@ async def revert_parameter(ctx: Context, node_path: str, parm_name: str) -> dict
 
 
 ###### parameters.link_parameters
+
 
 @mcp.tool()
 async def link_parameters(
@@ -208,6 +218,7 @@ async def link_parameters(
 
 ###### parameters.lock_parameter
 
+
 @mcp.tool()
 async def lock_parameter(
     ctx: Context, node_path: str, parm_name: str, locked: bool
@@ -229,6 +240,7 @@ async def lock_parameter(
 
 
 ###### parameters.create_spare_parameter
+
 
 @mcp.tool()
 async def create_spare_parameter(

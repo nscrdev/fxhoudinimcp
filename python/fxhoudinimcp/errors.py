@@ -9,7 +9,12 @@ from typing import Any
 class FXHoudiniError(Exception):
     """Base exception for all FXHoudini-MCP errors."""
 
-    def __init__(self, message: str, code: str = "UNKNOWN", details: dict[str, Any] | None = None):
+    def __init__(
+        self,
+        message: str,
+        code: str = "UNKNOWN",
+        details: dict[str, Any] | None = None,
+    ):
         super().__init__(message)
         self.code = code
         self.details = details or {}
@@ -18,7 +23,11 @@ class FXHoudiniError(Exception):
 class ConnectionError(FXHoudiniError):
     """Cannot connect to Houdini's hwebserver."""
 
-    def __init__(self, message: str = "Cannot connect to Houdini", details: dict | None = None):
+    def __init__(
+        self,
+        message: str = "Cannot connect to Houdini",
+        details: dict | None = None,
+    ):
         super().__init__(message, code="CONNECTION_ERROR", details=details)
 
 
@@ -67,5 +76,10 @@ class TimeoutError(FXHoudiniError):
 class HoudiniCommandError(FXHoudiniError):
     """Error returned from a Houdini command execution."""
 
-    def __init__(self, message: str, code: str = "COMMAND_ERROR", details: dict | None = None):
+    def __init__(
+        self,
+        message: str,
+        code: str = "COMMAND_ERROR",
+        details: dict | None = None,
+    ):
         super().__init__(message, code=code, details=details)

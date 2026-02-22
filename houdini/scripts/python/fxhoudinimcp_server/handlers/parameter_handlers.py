@@ -18,6 +18,7 @@ from fxhoudinimcp_server.dispatcher import register_handler
 
 ###### Helpers
 
+
 def _resolve_node(node_path: str) -> hou.Node:
     """Return the hou.Node at *node_path* or raise."""
     node = hou.node(node_path)
@@ -130,6 +131,7 @@ def _template_to_dict(pt: hou.ParmTemplate) -> dict[str, Any]:
 
 ###### Handler: parameters.get_parameter
 
+
 def _get_parameter(node_path: str, parm_name: str, **_: Any) -> dict[str, Any]:
     """Get the current value, expression, keyframe info, and metadata of a parameter."""
     parm = _resolve_parm(node_path, parm_name)
@@ -165,6 +167,7 @@ register_handler("parameters.get_parameter", _get_parameter)
 
 ###### Handler: parameters.set_parameter
 
+
 def _set_parameter(
     node_path: str, parm_name: str, value: Any, **_: Any
 ) -> dict[str, Any]:
@@ -185,6 +188,7 @@ register_handler("parameters.set_parameter", _set_parameter)
 
 ###### Handler: parameters.set_parameters
 
+
 def _set_parameters(
     node_path: str, params: dict[str, Any], **_: Any
 ) -> dict[str, Any]:
@@ -197,14 +201,18 @@ def _set_parameters(
     for name, value in params.items():
         parm = node.parm(name)
         if parm is None:
-            errors.append({"parm_name": name, "error": f"Parameter '{name}' not found"})
+            errors.append(
+                {"parm_name": name, "error": f"Parameter '{name}' not found"}
+            )
             continue
         try:
             parm.set(value)
-            results.append({
-                "parm_name": name,
-                "new_value": _serialize_value(parm.eval()),
-            })
+            results.append(
+                {
+                    "parm_name": name,
+                    "new_value": _serialize_value(parm.eval()),
+                }
+            )
         except Exception as exc:
             errors.append({"parm_name": name, "error": str(exc)})
 
@@ -220,12 +228,13 @@ register_handler("parameters.set_parameters", _set_parameters)
 
 ###### Handler: parameters.get_parameter_schema
 
+
 def _get_parameter_schema(
     node_path: str, parm_name: str | None = None, **_: Any
 ) -> dict[str, Any]:
     """Get full parameter template info.
 
-    If *parm_name* is ``None``, return info for every parameter on the node.
+    If *parm_name* is `None`, return info for every parameter on the node.
     """
     node = _resolve_node(node_path)
 
@@ -264,6 +273,7 @@ register_handler("parameters.get_parameter_schema", _get_parameter_schema)
 
 ###### Handler: parameters.set_expression
 
+
 def _set_expression(
     node_path: str,
     parm_name: str,
@@ -294,6 +304,7 @@ register_handler("parameters.set_expression", _set_expression)
 
 ###### Handler: parameters.get_expression
 
+
 def _get_expression(node_path: str, parm_name: str, **_: Any) -> dict[str, Any]:
     """Get the current expression on a parameter."""
     parm = _resolve_parm(node_path, parm_name)
@@ -318,7 +329,10 @@ register_handler("parameters.get_expression", _get_expression)
 
 ###### Handler: parameters.revert_parameter
 
-def _revert_parameter(node_path: str, parm_name: str, **_: Any) -> dict[str, Any]:
+
+def _revert_parameter(
+    node_path: str, parm_name: str, **_: Any
+) -> dict[str, Any]:
     """Revert a parameter to its default value."""
     parm = _resolve_parm(node_path, parm_name)
 
@@ -336,6 +350,7 @@ register_handler("parameters.revert_parameter", _revert_parameter)
 
 
 ###### Handler: parameters.link_parameters
+
 
 def _link_parameters(
     source_path: str,
@@ -364,6 +379,7 @@ register_handler("parameters.link_parameters", _link_parameters)
 
 ###### Handler: parameters.lock_parameter
 
+
 def _lock_parameter(
     node_path: str, parm_name: str, locked: bool, **_: Any
 ) -> dict[str, Any]:
@@ -383,6 +399,7 @@ register_handler("parameters.lock_parameter", _lock_parameter)
 
 
 ###### Handler: parameters.create_spare_parameter
+
 
 def _create_spare_parameter(
     node_path: str,
@@ -422,9 +439,7 @@ def _create_spare_parameter(
             if not isinstance(default_value, (list, tuple)):
                 default_value = [default_value]
             kwargs["num_components"] = len(default_value)
-            kwargs["default_value"] = (
-                tuple(default_value)
-            )
+            kwargs["default_value"] = tuple(default_value)
         else:
             kwargs["num_components"] = 1
 
@@ -451,9 +466,12 @@ def _create_spare_parameter(
 
     elif template_cls is hou.MenuParmTemplate:
         # For menu type, default_value should be a list of menu items
-        items = default_value if isinstance(default_value, (list, tuple)) else []
+        items = (
+            default_value if isinstance(default_value, (list, tuple)) else []
+        )
         pt = template_cls(
-            parm_name, label,
+            parm_name,
+            label,
             menu_items=tuple(str(i) for i in items),
             menu_labels=tuple(str(i) for i in items),
         )

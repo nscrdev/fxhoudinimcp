@@ -20,9 +20,12 @@ async def get_stage_info(ctx: Context, node_path: str) -> dict:
         node_path: Path to the LOP node (e.g. "/stage/sublayer1").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.get_stage_info", {
-        "node_path": node_path,
-    })
+    return await bridge.execute(
+        "lops.get_stage_info",
+        {
+            "node_path": node_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -38,10 +41,13 @@ async def get_usd_prim(
         prim_path: USD prim path on the stage (e.g. "/World/Cube").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.get_usd_prim", {
-        "node_path": node_path,
-        "prim_path": prim_path,
-    })
+    return await bridge.execute(
+        "lops.get_usd_prim",
+        {
+            "node_path": node_path,
+            "prim_path": prim_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -113,9 +119,12 @@ async def get_usd_layers(ctx: Context, node_path: str) -> dict:
         node_path: Path to the LOP node.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.get_usd_layers", {
-        "node_path": node_path,
-    })
+    return await bridge.execute(
+        "lops.get_usd_layers",
+        {
+            "node_path": node_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -131,10 +140,13 @@ async def get_usd_prim_stats(
         prim_path: Root prim path to gather stats from (default: "/").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.get_usd_prim_stats", {
-        "node_path": node_path,
-        "prim_path": prim_path,
-    })
+    return await bridge.execute(
+        "lops.get_usd_prim_stats",
+        {
+            "node_path": node_path,
+            "prim_path": prim_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -145,9 +157,12 @@ async def get_last_modified_prims(ctx: Context, node_path: str) -> dict:
         node_path: Path to the LOP node.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.get_last_modified_prims", {
-        "node_path": node_path,
-    })
+    return await bridge.execute(
+        "lops.get_last_modified_prims",
+        {
+            "node_path": node_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -198,12 +213,15 @@ async def set_usd_attribute(
         value: Value to set on the attribute.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.set_usd_attribute", {
-        "node_path": node_path,
-        "prim_path": prim_path,
-        "attr_name": attr_name,
-        "value": value,
-    })
+    return await bridge.execute(
+        "lops.set_usd_attribute",
+        {
+            "node_path": node_path,
+            "prim_path": prim_path,
+            "attr_name": attr_name,
+            "value": value,
+        },
+    )
 
 
 @mcp.tool()
@@ -214,9 +232,12 @@ async def get_usd_materials(ctx: Context, node_path: str) -> dict:
         node_path: Path to the LOP node.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.get_usd_materials", {
-        "node_path": node_path,
-    })
+    return await bridge.execute(
+        "lops.get_usd_materials",
+        {
+            "node_path": node_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -232,10 +253,13 @@ async def find_usd_prims(
         pattern: Search pattern (e.g. "*/Cube*", "**/materials/*", or a substring).
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.find_usd_prims", {
-        "node_path": node_path,
-        "pattern": pattern,
-    })
+    return await bridge.execute(
+        "lops.find_usd_prims",
+        {
+            "node_path": node_path,
+            "pattern": pattern,
+        },
+    )
 
 
 @mcp.tool()
@@ -251,10 +275,13 @@ async def get_usd_composition(
         prim_path: USD prim path to inspect.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.get_usd_composition", {
-        "node_path": node_path,
-        "prim_path": prim_path,
-    })
+    return await bridge.execute(
+        "lops.get_usd_composition",
+        {
+            "node_path": node_path,
+            "prim_path": prim_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -270,10 +297,13 @@ async def get_usd_variants(
         prim_path: USD prim path to inspect.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.get_usd_variants", {
-        "node_path": node_path,
-        "prim_path": prim_path,
-    })
+    return await bridge.execute(
+        "lops.get_usd_variants",
+        {
+            "node_path": node_path,
+            "prim_path": prim_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -291,10 +321,13 @@ async def inspect_usd_layer(
         layer_index: Index of the layer to inspect (0 = root layer).
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.inspect_usd_layer", {
-        "node_path": node_path,
-        "layer_index": layer_index,
-    })
+    return await bridge.execute(
+        "lops.inspect_usd_layer",
+        {
+            "node_path": node_path,
+            "layer_index": layer_index,
+        },
+    )
 
 
 @mcp.tool()
@@ -349,9 +382,12 @@ async def list_lights(ctx: Context, node_path: str) -> dict:
         node_path: Path to the LOP node (e.g. "/stage/domelight1").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.list_lights", {
-        "node_path": node_path,
-    })
+    return await bridge.execute(
+        "lops.list_lights",
+        {
+            "node_path": node_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -373,11 +409,14 @@ async def set_light_properties(
         properties: Dict of property name -> value to set.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.set_light_properties", {
-        "node_path": node_path,
-        "prim_path": prim_path,
-        "properties": properties,
-    })
+    return await bridge.execute(
+        "lops.set_light_properties",
+        {
+            "node_path": node_path,
+            "prim_path": prim_path,
+            "properties": properties,
+        },
+    )
 
 
 @mcp.tool()
@@ -402,8 +441,11 @@ async def create_light_rig(
         intensity_mult: Multiplier applied to all light intensities (default: 1.0).
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("lops.create_light_rig", {
-        "parent_path": parent_path,
-        "preset": preset,
-        "intensity_mult": intensity_mult,
-    })
+    return await bridge.execute(
+        "lops.create_light_rig",
+        {
+            "parent_path": parent_path,
+            "preset": preset,
+            "intensity_mult": intensity_mult,
+        },
+    )

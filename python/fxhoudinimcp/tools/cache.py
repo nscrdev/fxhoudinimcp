@@ -31,9 +31,12 @@ async def list_caches(
         root_path: Root path to search from (default: "/").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("cache.list_caches", {
-        "root_path": root_path,
-    })
+    return await bridge.execute(
+        "cache.list_caches",
+        {
+            "root_path": root_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -48,9 +51,12 @@ async def get_cache_status(ctx: Context, node_path: str) -> dict:
         node_path: Path to the cache node (e.g. "/obj/geo1/filecache1").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("cache.get_cache_status", {
-        "node_path": node_path,
-    })
+    return await bridge.execute(
+        "cache.get_cache_status",
+        {
+            "node_path": node_path,
+        },
+    )
 
 
 @mcp.tool()

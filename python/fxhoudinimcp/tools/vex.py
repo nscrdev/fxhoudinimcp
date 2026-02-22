@@ -62,10 +62,13 @@ async def set_wrangle_code(
         vex_code: The VEX snippet code to set.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("vex.set_wrangle_code", {
-        "node_path": node_path,
-        "vex_code": vex_code,
-    })
+    return await bridge.execute(
+        "vex.set_wrangle_code",
+        {
+            "node_path": node_path,
+            "vex_code": vex_code,
+        },
+    )
 
 
 @mcp.tool()
@@ -79,7 +82,9 @@ async def get_wrangle_code(ctx: Context, node_path: str) -> dict:
         node_path: Path to the wrangle node.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("vex.get_wrangle_code", {"node_path": node_path})
+    return await bridge.execute(
+        "vex.get_wrangle_code", {"node_path": node_path}
+    )
 
 
 @mcp.tool()
@@ -101,11 +106,14 @@ async def create_vex_expression(
         vex_code: The VEX expression code.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("vex.create_vex_expression", {
-        "node_path": node_path,
-        "parm_name": parm_name,
-        "vex_code": vex_code,
-    })
+    return await bridge.execute(
+        "vex.create_vex_expression",
+        {
+            "node_path": node_path,
+            "parm_name": parm_name,
+            "vex_code": vex_code,
+        },
+    )
 
 
 @mcp.tool()

@@ -25,6 +25,7 @@ _MAX_CAPTURE_BYTES = 100 * 1024  # 100 KB
 
 ###### Helpers
 
+
 def _truncate_output(text: str) -> str:
     """Truncate captured output to _MAX_CAPTURE_BYTES if it exceeds the limit."""
     if len(text) > _MAX_CAPTURE_BYTES:
@@ -50,14 +51,15 @@ def _serialize_result(value: Any) -> Any:
 
 ###### Handler: code.execute_python
 
+
 def _execute_python(
     code: str, return_expression: str | None = None, **_: Any
 ) -> dict[str, Any]:
     """Execute arbitrary Python code inside Houdini's interpreter.
 
-    The code is executed via ``exec()`` in a namespace that has ``hou``
+    The code is executed via `exec()` in a namespace that has `hou`
     pre-imported.  If *return_expression* is given it is evaluated with
-    ``eval()`` in the same namespace after execution, and its result is
+    `eval()` in the same namespace after execution, and its result is
     returned.
 
     stdout and stderr are captured and included in the response so the
@@ -98,6 +100,7 @@ register_handler("code.execute_python", _execute_python)
 
 ###### Handler: code.execute_hscript
 
+
 def _execute_hscript(command: str, **_: Any) -> dict[str, Any]:
     """Execute an HScript command and return its output."""
     output, errors = hou.hscript(command)
@@ -113,13 +116,14 @@ register_handler("code.execute_hscript", _execute_hscript)
 
 ###### Handler: code.evaluate_expression
 
+
 def _evaluate_expression(
     expression: str, language: str = "hscript", **_: Any
 ) -> dict[str, Any]:
     """Evaluate an expression and return its result.
 
-    Supports both HScript expressions (via ``hou.hscriptExpression()``)
-    and Python expressions (via ``eval()``).
+    Supports both HScript expressions (via `hou.hscriptExpression()`)
+    and Python expressions (via `eval()`).
     """
     if language.lower() == "python":
         namespace: dict[str, Any] = {"hou": hou}
@@ -138,6 +142,7 @@ register_handler("code.evaluate_expression", _evaluate_expression)
 
 
 ###### Handler: code.get_env_variable
+
 
 def _get_env_variable(var_name: str, **_: Any) -> dict[str, Any]:
     """Get a Houdini environment variable."""

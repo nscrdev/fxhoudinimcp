@@ -53,9 +53,12 @@ async def set_current_take(ctx: Context, name: str) -> dict:
         name: Name of the take to make current.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("takes.set_current_take", {
-        "name": name,
-    })
+    return await bridge.execute(
+        "takes.set_current_take",
+        {
+            "name": name,
+        },
+    )
 
 
 @mcp.tool()

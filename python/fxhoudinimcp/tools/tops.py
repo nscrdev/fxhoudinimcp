@@ -25,7 +25,9 @@ async def get_top_network_info(ctx: Context, node_path: str) -> dict:
         node_path: Path to a TOP network node (topnet) or a TOP node inside one.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("tops.get_top_network_info", {"node_path": node_path})
+    return await bridge.execute(
+        "tops.get_top_network_info", {"node_path": node_path}
+    )
 
 
 @mcp.tool()
@@ -47,11 +49,14 @@ async def cook_top_node(
         generate_only: If True, only generate work items without cooking.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("tops.cook_top_node", {
-        "node_path": node_path,
-        "block": block,
-        "generate_only": generate_only,
-    })
+    return await bridge.execute(
+        "tops.cook_top_node",
+        {
+            "node_path": node_path,
+            "block": block,
+            "generate_only": generate_only,
+        },
+    )
 
 
 @mcp.tool()
@@ -63,7 +68,9 @@ async def cancel_top_cook(ctx: Context, node_path: str) -> dict:
         node_path: Path to a TOP node or TOP network.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("tops.cancel_top_cook", {"node_path": node_path})
+    return await bridge.execute(
+        "tops.cancel_top_cook", {"node_path": node_path}
+    )
 
 
 @mcp.tool()
@@ -92,10 +99,13 @@ async def dirty_work_items(
         remove_outputs: If True, also remove output files from disk.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("tops.dirty_work_items", {
-        "node_path": node_path,
-        "remove_outputs": remove_outputs,
-    })
+    return await bridge.execute(
+        "tops.dirty_work_items",
+        {
+            "node_path": node_path,
+            "remove_outputs": remove_outputs,
+        },
+    )
 
 
 @mcp.tool()
@@ -110,7 +120,9 @@ async def get_work_item_states(ctx: Context, node_path: str) -> dict:
         node_path: Path to the TOP node.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("tops.get_work_item_states", {"node_path": node_path})
+    return await bridge.execute(
+        "tops.get_work_item_states", {"node_path": node_path}
+    )
 
 
 @mcp.tool()
@@ -130,10 +142,13 @@ async def get_work_item_info(
         work_item_index: Index of the work item within the node.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("tops.get_work_item_info", {
-        "node_path": node_path,
-        "work_item_index": work_item_index,
-    })
+    return await bridge.execute(
+        "tops.get_work_item_info",
+        {
+            "node_path": node_path,
+            "work_item_index": work_item_index,
+        },
+    )
 
 
 @mcp.tool()
@@ -161,7 +176,9 @@ async def generate_static_items(ctx: Context, node_path: str) -> dict:
         node_path: Path to the TOP node.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("tops.generate_static_items", {"node_path": node_path})
+    return await bridge.execute(
+        "tops.generate_static_items", {"node_path": node_path}
+    )
 
 
 @mcp.tool()
@@ -176,4 +193,6 @@ async def get_top_scheduler_info(ctx: Context, node_path: str) -> dict:
         node_path: Path to a TOP scheduler node or a TOP network.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("tops.get_top_scheduler_info", {"node_path": node_path})
+    return await bridge.execute(
+        "tops.get_top_scheduler_info", {"node_path": node_path}
+    )

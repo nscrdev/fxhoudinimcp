@@ -18,13 +18,14 @@ from fxhoudinimcp.server import mcp, _get_bridge
 
 ###### code.execute_python
 
+
 @mcp.tool()
 async def execute_python(
     ctx: Context, code: str, return_expression: str | None = None
 ) -> dict:
     """Execute arbitrary Python code inside Houdini's Python interpreter.
 
-    The code runs via exec() in a namespace with ``hou`` pre-imported.
+    The code runs via exec() in a namespace with `hou` pre-imported.
     If return_expression is provided, it is evaluated after execution and
     its result is included in the response.
 
@@ -45,6 +46,7 @@ async def execute_python(
 
 ###### code.execute_hscript
 
+
 @mcp.tool()
 async def execute_hscript(ctx: Context, command: str) -> dict:
     """Execute an HScript command in Houdini.
@@ -59,6 +61,7 @@ async def execute_hscript(ctx: Context, command: str) -> dict:
 
 
 ###### code.evaluate_expression
+
 
 @mcp.tool()
 async def evaluate_expression(
@@ -81,6 +84,7 @@ async def evaluate_expression(
 
 
 ###### code.get_env_variable
+
 
 @mcp.tool()
 async def get_env_variable(ctx: Context, var_name: str) -> dict:

@@ -31,7 +31,9 @@ async def lifespan(server: FastMCP):
 
     try:
         info = await bridge.health_check()
-        logger.info("Connected to Houdini %s", info.get("houdini_version", "unknown"))
+        logger.info(
+            "Connected to Houdini %s", info.get("houdini_version", "unknown")
+        )
     except Exception as e:
         logger.warning("Cannot reach Houdini at startup: %s", e)
         logger.warning("Tools will attempt to connect on first use.")

@@ -44,13 +44,16 @@ async def setup_pyro_sim(
         name: Name for the top-level geometry node (default: "pyro_sim").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("workflow.setup_pyro_sim", {
-        "source_geo": source_geo,
-        "container": container,
-        "res_scale": res_scale,
-        "substeps": substeps,
-        "name": name,
-    })
+    return await bridge.execute(
+        "workflow.setup_pyro_sim",
+        {
+            "source_geo": source_geo,
+            "container": container,
+            "res_scale": res_scale,
+            "substeps": substeps,
+            "name": name,
+        },
+    )
 
 
 @mcp.tool()
@@ -76,12 +79,15 @@ async def setup_rbd_sim(
         name: Name for the top-level geometry node (default: "rbd_sim").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("workflow.setup_rbd_sim", {
-        "geo_path": geo_path,
-        "ground": ground,
-        "pieces_type": pieces_type,
-        "name": name,
-    })
+    return await bridge.execute(
+        "workflow.setup_rbd_sim",
+        {
+            "geo_path": geo_path,
+            "ground": ground,
+            "pieces_type": pieces_type,
+            "name": name,
+        },
+    )
 
 
 @mcp.tool()
@@ -107,12 +113,15 @@ async def setup_flip_sim(
         name: Name for the top-level geometry node (default: "flip_sim").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("workflow.setup_flip_sim", {
-        "source_geo": source_geo,
-        "domain": domain,
-        "particle_sep": particle_sep,
-        "name": name,
-    })
+    return await bridge.execute(
+        "workflow.setup_flip_sim",
+        {
+            "source_geo": source_geo,
+            "domain": domain,
+            "particle_sep": particle_sep,
+            "name": name,
+        },
+    )
 
 
 @mcp.tool()
@@ -138,12 +147,15 @@ async def setup_vellum_sim(
         name: Name for the top-level geometry node (default: "vellum_sim").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("workflow.setup_vellum_sim", {
-        "geo_path": geo_path,
-        "sim_type": sim_type,
-        "substeps": substeps,
-        "name": name,
-    })
+    return await bridge.execute(
+        "workflow.setup_vellum_sim",
+        {
+            "geo_path": geo_path,
+            "sim_type": sim_type,
+            "substeps": substeps,
+            "name": name,
+        },
+    )
 
 
 @mcp.tool()
@@ -203,10 +215,13 @@ async def assign_material(
         material_path: Path to the material to assign (e.g. "/mat/material1").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("workflow.assign_material", {
-        "geo_path": geo_path,
-        "material_path": material_path,
-    })
+    return await bridge.execute(
+        "workflow.assign_material",
+        {
+            "geo_path": geo_path,
+            "material_path": material_path,
+        },
+    )
 
 
 @mcp.tool()

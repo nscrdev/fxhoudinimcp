@@ -20,9 +20,12 @@ async def get_geometry_info(ctx: Context, node_path: str) -> dict:
         node_path: Path to the SOP node (e.g. "/obj/geo1/sphere1").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("geometry.get_geometry_info", {
-        "node_path": node_path,
-    })
+    return await bridge.execute(
+        "geometry.get_geometry_info",
+        {
+            "node_path": node_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -105,11 +108,14 @@ async def get_attrib_values(
         attrib_class: Attribute class - "point", "prim", "vertex", or "detail".
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("geometry.get_attrib_values", {
-        "node_path": node_path,
-        "attrib_name": attrib_name,
-        "attrib_class": attrib_class,
-    })
+    return await bridge.execute(
+        "geometry.get_attrib_values",
+        {
+            "node_path": node_path,
+            "attrib_name": attrib_name,
+            "attrib_class": attrib_class,
+        },
+    )
 
 
 @mcp.tool()
@@ -130,11 +136,14 @@ async def set_detail_attrib(
         value: Value to set (float, int, string, or list of floats).
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("geometry.set_detail_attrib", {
-        "node_path": node_path,
-        "attrib_name": attrib_name,
-        "value": value,
-    })
+    return await bridge.execute(
+        "geometry.set_detail_attrib",
+        {
+            "node_path": node_path,
+            "attrib_name": attrib_name,
+            "value": value,
+        },
+    )
 
 
 @mcp.tool()
@@ -145,9 +154,12 @@ async def get_groups(ctx: Context, node_path: str) -> dict:
         node_path: Path to the SOP node.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("geometry.get_groups", {
-        "node_path": node_path,
-    })
+    return await bridge.execute(
+        "geometry.get_groups",
+        {
+            "node_path": node_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -165,11 +177,14 @@ async def get_group_members(
         group_type: Type of group - "point", "prim", or "edge".
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("geometry.get_group_members", {
-        "node_path": node_path,
-        "group_name": group_name,
-        "group_type": group_type,
-    })
+    return await bridge.execute(
+        "geometry.get_group_members",
+        {
+            "node_path": node_path,
+            "group_name": group_name,
+            "group_type": group_type,
+        },
+    )
 
 
 @mcp.tool()
@@ -182,9 +197,12 @@ async def get_bounding_box(ctx: Context, node_path: str) -> dict:
         node_path: Path to the SOP node.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("geometry.get_bounding_box", {
-        "node_path": node_path,
-    })
+    return await bridge.execute(
+        "geometry.get_bounding_box",
+        {
+            "node_path": node_path,
+        },
+    )
 
 
 @mcp.tool()
@@ -202,11 +220,14 @@ async def get_attribute_info(
         attrib_class: Attribute class - "point", "prim", "vertex", or "detail".
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("geometry.get_attribute_info", {
-        "node_path": node_path,
-        "attrib_name": attrib_name,
-        "attrib_class": attrib_class,
-    })
+    return await bridge.execute(
+        "geometry.get_attribute_info",
+        {
+            "node_path": node_path,
+            "attrib_name": attrib_name,
+            "attrib_class": attrib_class,
+        },
+    )
 
 
 @mcp.tool()
@@ -227,11 +248,14 @@ async def sample_geometry(
         seed: Random seed for reproducible sampling (default: 0).
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("geometry.sample_geometry", {
-        "node_path": node_path,
-        "sample_count": sample_count,
-        "seed": seed,
-    })
+    return await bridge.execute(
+        "geometry.sample_geometry",
+        {
+            "node_path": node_path,
+            "sample_count": sample_count,
+            "seed": seed,
+        },
+    )
 
 
 @mcp.tool()
@@ -271,8 +295,11 @@ async def find_nearest_point(
         max_results: Maximum number of nearest points to return (default: 1).
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("geometry.find_nearest_point", {
-        "node_path": node_path,
-        "position": position,
-        "max_results": max_results,
-    })
+    return await bridge.execute(
+        "geometry.find_nearest_point",
+        {
+            "node_path": node_path,
+            "position": position,
+            "max_results": max_results,
+        },
+    )

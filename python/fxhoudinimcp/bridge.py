@@ -38,7 +38,9 @@ class HoudiniBridge:
     Calls are dispatched by function name inside the JSON-encoded body.
     """
 
-    def __init__(self, host: str = "localhost", port: int = 8100, timeout: float = 60.0):
+    def __init__(
+        self, host: str = "localhost", port: int = 8100, timeout: float = 60.0
+    ):
         self.base_url = f"http://{host}:{port}"
         self.timeout = timeout
         self._client: httpx.AsyncClient | None = None
@@ -99,7 +101,10 @@ class HoudiniBridge:
         except httpx.HTTPStatusError as e:
             raise ConnectionError(
                 f"Houdini returned HTTP {e.response.status_code}",
-                details={"status_code": e.response.status_code, "body": e.response.text},
+                details={
+                    "status_code": e.response.status_code,
+                    "body": e.response.text,
+                },
             ) from e
         except httpx.TimeoutException as e:
             raise ConnectionError(

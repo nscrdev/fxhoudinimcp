@@ -67,10 +67,13 @@ async def rename_node(ctx: Context, node_path: str, new_name: str) -> dict:
         new_name: Desired new name for the node.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("nodes.rename_node", {
-        "node_path": node_path,
-        "new_name": new_name,
-    })
+    return await bridge.execute(
+        "nodes.rename_node",
+        {
+            "node_path": node_path,
+            "new_name": new_name,
+        },
+    )
 
 
 @mcp.tool()
@@ -107,10 +110,13 @@ async def move_node(ctx: Context, node_path: str, dest_parent: str) -> dict:
         dest_parent: Destination parent network path.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("nodes.move_node", {
-        "node_path": node_path,
-        "dest_parent": dest_parent,
-    })
+    return await bridge.execute(
+        "nodes.move_node",
+        {
+            "node_path": node_path,
+            "dest_parent": dest_parent,
+        },
+    )
 
 
 @mcp.tool()
@@ -218,12 +224,15 @@ async def connect_nodes(
         input_index: Input connector index on the destination node (default: 0).
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("nodes.connect_nodes", {
-        "source_path": source_path,
-        "dest_path": dest_path,
-        "output_index": output_index,
-        "input_index": input_index,
-    })
+    return await bridge.execute(
+        "nodes.connect_nodes",
+        {
+            "source_path": source_path,
+            "dest_path": dest_path,
+            "output_index": output_index,
+            "input_index": input_index,
+        },
+    )
 
 
 @mcp.tool()
@@ -262,10 +271,13 @@ async def reorder_inputs(ctx: Context, node_path: str, new_order: list) -> dict:
                    For example, [1, 0] swaps the first two inputs.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("nodes.reorder_inputs", {
-        "node_path": node_path,
-        "new_order": new_order,
-    })
+    return await bridge.execute(
+        "nodes.reorder_inputs",
+        {
+            "node_path": node_path,
+            "new_order": new_order,
+        },
+    )
 
 
 @mcp.tool()
@@ -330,7 +342,9 @@ async def layout_children(
 
 
 @mcp.tool()
-async def set_node_position(ctx: Context, node_path: str, x: float, y: float) -> dict:
+async def set_node_position(
+    ctx: Context, node_path: str, x: float, y: float
+) -> dict:
     """Set the position of a node in the Houdini network editor.
 
     Args:
@@ -340,11 +354,14 @@ async def set_node_position(ctx: Context, node_path: str, x: float, y: float) ->
         y: Vertical position.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("nodes.set_node_position", {
-        "node_path": node_path,
-        "x": x,
-        "y": y,
-    })
+    return await bridge.execute(
+        "nodes.set_node_position",
+        {
+            "node_path": node_path,
+            "x": x,
+            "y": y,
+        },
+    )
 
 
 @mcp.tool()
@@ -365,9 +382,12 @@ async def set_node_color(
         b: Blue component (0.0 to 1.0).
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("nodes.set_node_color", {
-        "node_path": node_path,
-        "r": r,
-        "g": g,
-        "b": b,
-    })
+    return await bridge.execute(
+        "nodes.set_node_color",
+        {
+            "node_path": node_path,
+            "r": r,
+            "g": g,
+            "b": b,
+        },
+    )

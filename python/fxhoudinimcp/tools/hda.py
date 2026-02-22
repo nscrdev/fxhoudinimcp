@@ -79,10 +79,13 @@ async def install_hda(
         force: If True, force reinstall even if already loaded.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("hda.install_hda", {
-        "file_path": file_path,
-        "force": force,
-    })
+    return await bridge.execute(
+        "hda.install_hda",
+        {
+            "file_path": file_path,
+            "force": force,
+        },
+    )
 
 
 @mcp.tool()
@@ -132,13 +135,16 @@ async def create_hda(
         version: Version string (default "1.0").
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("hda.create_hda", {
-        "node_path": node_path,
-        "hda_file": hda_file,
-        "type_name": type_name,
-        "label": label,
-        "version": version,
-    })
+    return await bridge.execute(
+        "hda.create_hda",
+        {
+            "node_path": node_path,
+            "hda_file": hda_file,
+            "type_name": type_name,
+            "label": label,
+            "version": version,
+        },
+    )
 
 
 @mcp.tool()
@@ -168,7 +174,9 @@ async def get_hda_sections(ctx: Context, node_path: str) -> dict:
         node_path: Path to an HDA node instance.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("hda.get_hda_sections", {"node_path": node_path})
+    return await bridge.execute(
+        "hda.get_hda_sections", {"node_path": node_path}
+    )
 
 
 @mcp.tool()
@@ -188,10 +196,13 @@ async def get_hda_section_content(
         section_name: Name of the section to read.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("hda.get_hda_section_content", {
-        "node_path": node_path,
-        "section_name": section_name,
-    })
+    return await bridge.execute(
+        "hda.get_hda_section_content",
+        {
+            "node_path": node_path,
+            "section_name": section_name,
+        },
+    )
 
 
 @mcp.tool()
@@ -213,8 +224,11 @@ async def set_hda_section_content(
         content: The content to write to the section.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("hda.set_hda_section_content", {
-        "node_path": node_path,
-        "section_name": section_name,
-        "content": content,
-    })
+    return await bridge.execute(
+        "hda.set_hda_section_content",
+        {
+            "node_path": node_path,
+            "section_name": section_name,
+            "content": content,
+        },
+    )
