@@ -3071,7 +3071,7 @@ via the HTTP bridge.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.hda.install_hda&lt;/code&gt;)" href="#fxhoudinimcp.tools.hda.install_hda">install_hda</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Install an HDA file into the current Houdini session.</p>
+                  <p>Install an HDA file into the current session.</p>
                 </div>
               </td>
             </tr>
@@ -3097,7 +3097,7 @@ via the HTTP bridge.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.hda.reload_hda&lt;/code&gt;)" href="#fxhoudinimcp.tools.hda.reload_hda">reload_hda</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Reload an HDA file from disk to pick up external changes.</p>
+                  <p>Reload an HDA file from disk.</p>
                 </div>
               </td>
             </tr>
@@ -3123,7 +3123,7 @@ via the HTTP bridge.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.hda.uninstall_hda&lt;/code&gt;)" href="#fxhoudinimcp.tools.hda.uninstall_hda">uninstall_hda</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Uninstall an HDA file from the current Houdini session.</p>
+                  <p>Uninstall an HDA file from the current session.</p>
                 </div>
               </td>
             </tr>
@@ -3183,8 +3183,6 @@ via the HTTP bridge.</p>
     <div class="doc doc-contents ">
 
         <p>Create a new HDA from an existing subnet node.</p>
-<p>Converts a subnet into a reusable Houdini Digital Asset and saves
-it to the specified file.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3223,7 +3221,7 @@ it to the specified file.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to the subnet node to convert.</p>
+                <p>Subnet node path.</p>
               </div>
             </td>
             <td>
@@ -3239,7 +3237,7 @@ it to the specified file.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Destination file path for the HDA.</p>
+                <p>Destination HDA file path.</p>
               </div>
             </td>
             <td>
@@ -3255,7 +3253,7 @@ it to the specified file.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The operator type name for the HDA.</p>
+                <p>Operator type name.</p>
               </div>
             </td>
             <td>
@@ -3271,7 +3269,7 @@ it to the specified file.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Human-readable label for the HDA.</p>
+                <p>Human-readable label.</p>
               </div>
             </td>
             <td>
@@ -3287,7 +3285,7 @@ it to the specified file.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Version string (default "1.0").</p>
+                <p>Version string.</p>
               </div>
             </td>
             <td>
@@ -3325,8 +3323,6 @@ it to the specified file.</p>
     <div class="doc doc-contents ">
 
         <p>Get detailed information about an HDA definition.</p>
-<p>Provide at least one of node_path, hda_file, or type_name. Returns
-version, description, inputs/outputs, parameters, and section list.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3365,7 +3361,7 @@ version, description, inputs/outputs, parameters, and section list.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to an HDA node instance in the scene.</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -3381,7 +3377,7 @@ version, description, inputs/outputs, parameters, and section list.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to an HDA file on disk.</p>
+                <p>HDA file path.</p>
               </div>
             </td>
             <td>
@@ -3397,7 +3393,7 @@ version, description, inputs/outputs, parameters, and section list.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Fully qualified HDA type name.</p>
+                <p>HDA type name.</p>
               </div>
             </td>
             <td>
@@ -3432,8 +3428,6 @@ version, description, inputs/outputs, parameters, and section list.</p>
     <div class="doc doc-contents ">
 
         <p>Read the content of a specific section in an HDA definition.</p>
-<p>Common sections: "PythonModule", "DialogScript", "Help",
-"ExtraFileOptions", "OnCreated", etc.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3472,7 +3466,7 @@ version, description, inputs/outputs, parameters, and section list.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to an HDA node instance.</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -3488,7 +3482,7 @@ version, description, inputs/outputs, parameters, and section list.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Name of the section to read.</p>
+                <p>Section name.</p>
               </div>
             </td>
             <td>
@@ -3521,8 +3515,6 @@ version, description, inputs/outputs, parameters, and section list.</p>
     <div class="doc doc-contents ">
 
         <p>List all sections in an HDA definition.</p>
-<p>Sections include DialogScript, PythonModule, Help, ExtraFileOptions,
-and other embedded data sections.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3561,7 +3553,7 @@ and other embedded data sections.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to an HDA node instance.</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -3593,7 +3585,7 @@ and other embedded data sections.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Install an HDA file into the current Houdini session.</p>
+        <p>Install an HDA file into the current session.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3632,7 +3624,7 @@ and other embedded data sections.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to the HDA file to install.</p>
+                <p>HDA file path.</p>
               </div>
             </td>
             <td>
@@ -3648,7 +3640,7 @@ and other embedded data sections.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If True, force reinstall even if already loaded.</p>
+                <p>Force reinstall even if already loaded.</p>
               </div>
             </td>
             <td>
@@ -3681,7 +3673,6 @@ and other embedded data sections.</p>
     <div class="doc doc-contents ">
 
         <p>List all installed HDA files and their definitions.</p>
-<p>Returns type names, descriptions, library file paths, and versions.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3720,7 +3711,7 @@ and other embedded data sections.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Optional substring filter for HDA type names or file paths.</p>
+                <p>Substring filter for type names or file paths.</p>
               </div>
             </td>
             <td>
@@ -3752,7 +3743,7 @@ and other embedded data sections.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Reload an HDA file from disk to pick up external changes.</p>
+        <p>Reload an HDA file from disk.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3791,7 +3782,7 @@ and other embedded data sections.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to the HDA file to reload.</p>
+                <p>HDA file path.</p>
               </div>
             </td>
             <td>
@@ -3826,8 +3817,6 @@ and other embedded data sections.</p>
     <div class="doc doc-contents ">
 
         <p>Write content to a specific section in an HDA definition.</p>
-<p>Creates the section if it does not already exist. Use this to update
-PythonModule code, Help cards, dialog scripts, and other HDA sections.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3866,7 +3855,7 @@ PythonModule code, Help cards, dialog scripts, and other HDA sections.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to an HDA node instance.</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -3882,7 +3871,7 @@ PythonModule code, Help cards, dialog scripts, and other HDA sections.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Name of the section to write.</p>
+                <p>Section name.</p>
               </div>
             </td>
             <td>
@@ -3898,7 +3887,7 @@ PythonModule code, Help cards, dialog scripts, and other HDA sections.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The content to write to the section.</p>
+                <p>Section content.</p>
               </div>
             </td>
             <td>
@@ -3930,7 +3919,7 @@ PythonModule code, Help cards, dialog scripts, and other HDA sections.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Uninstall an HDA file from the current Houdini session.</p>
+        <p>Uninstall an HDA file from the current session.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3969,7 +3958,7 @@ PythonModule code, Help cards, dialog scripts, and other HDA sections.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to the HDA file to uninstall.</p>
+                <p>HDA file path.</p>
               </div>
             </td>
             <td>
@@ -4002,8 +3991,6 @@ PythonModule code, Help cards, dialog scripts, and other HDA sections.</p>
     <div class="doc doc-contents ">
 
         <p>Save the current node contents back to its HDA definition.</p>
-<p>Updates the HDA definition on disk with any changes made to the
-node's internal network.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4042,7 +4029,7 @@ node's internal network.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to the HDA node instance.</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -4086,7 +4073,7 @@ node's internal network.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 22, 2026 19:49:07 UTC">February 22, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 22, 2026 20:29:29 UTC">February 22, 2026</span>
   </span>
 
     
@@ -4096,7 +4083,7 @@ node's internal network.</p>
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 22, 2026 19:49:07 UTC">February 22, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 22, 2026 20:29:29 UTC">February 22, 2026</span>
   </span>
 
     

@@ -2887,7 +2887,7 @@ via the HTTP bridge.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.tops.cancel_top_cook&lt;/code&gt;)" href="#fxhoudinimcp.tools.tops.cancel_top_cook">cancel_top_cook</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Cancel any active cooking on a TOP network.</p>
+                  <p>Cancel active cooking on a TOP network.</p>
                 </div>
               </td>
             </tr>
@@ -2913,7 +2913,7 @@ via the HTTP bridge.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.tops.dirty_work_items&lt;/code&gt;)" href="#fxhoudinimcp.tools.tops.dirty_work_items">dirty_work_items</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Dirty (invalidate) work items on a TOP node so they can be regenerated.</p>
+                  <p>Dirty work items on a TOP node so they can be regenerated.</p>
                 </div>
               </td>
             </tr>
@@ -2926,7 +2926,7 @@ via the HTTP bridge.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.tops.generate_static_items&lt;/code&gt;)" href="#fxhoudinimcp.tools.tops.generate_static_items">generate_static_items</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Generate static work items on a TOP node without cooking them.</p>
+                  <p>Generate static work items on a TOP node without cooking.</p>
                 </div>
               </td>
             </tr>
@@ -2952,7 +2952,7 @@ via the HTTP bridge.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.tops.get_top_network_info&lt;/code&gt;)" href="#fxhoudinimcp.tools.tops.get_top_network_info">get_top_network_info</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Get an overview of a TOP network including node count, scheduler info, and cook state.</p>
+                  <p>Get an overview of a TOP network.</p>
                 </div>
               </td>
             </tr>
@@ -2978,7 +2978,7 @@ via the HTTP bridge.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.tops.get_work_item_info&lt;/code&gt;)" href="#fxhoudinimcp.tools.tops.get_work_item_info">get_work_item_info</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Get detailed information about a specific work item on a TOP node.</p>
+                  <p>Get detailed information about a specific work item.</p>
                 </div>
               </td>
             </tr>
@@ -2991,7 +2991,7 @@ via the HTTP bridge.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.tops.get_work_item_states&lt;/code&gt;)" href="#fxhoudinimcp.tools.tops.get_work_item_states">get_work_item_states</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Get the count of work items in each state for a TOP node.</p>
+                  <p>Get work item state counts for a TOP node.</p>
                 </div>
               </td>
             </tr>
@@ -3043,7 +3043,7 @@ via the HTTP bridge.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Cancel any active cooking on a TOP network.</p>
+        <p>Cancel active cooking on a TOP network.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3082,7 +3082,7 @@ via the HTTP bridge.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to a TOP node or TOP network.</p>
+                <p>TOP node or TOPnet path.</p>
               </div>
             </td>
             <td>
@@ -3120,8 +3120,6 @@ via the HTTP bridge.</p>
     <div class="doc doc-contents ">
 
         <p>Cook a TOP node to execute its work items.</p>
-<p>Uses blocking cook by default. Set generate_only=True to only generate
-work items without executing them.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3160,7 +3158,7 @@ work items without executing them.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to the TOP node to cook.</p>
+                <p>TOP node path.</p>
               </div>
             </td>
             <td>
@@ -3176,7 +3174,7 @@ work items without executing them.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If True, wait for cooking to complete before returning.</p>
+                <p>Wait for cooking to complete.</p>
               </div>
             </td>
             <td>
@@ -3192,7 +3190,7 @@ work items without executing them.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If True, only generate work items without cooking.</p>
+                <p>Only generate work items, do not cook.</p>
               </div>
             </td>
             <td>
@@ -3226,7 +3224,7 @@ work items without executing them.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Dirty (invalidate) work items on a TOP node so they can be regenerated.</p>
+        <p>Dirty work items on a TOP node so they can be regenerated.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3265,7 +3263,7 @@ work items without executing them.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to the TOP node.</p>
+                <p>TOP node path.</p>
               </div>
             </td>
             <td>
@@ -3281,7 +3279,7 @@ work items without executing them.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>If True, also remove output files from disk.</p>
+                <p>Also remove output files from disk.</p>
               </div>
             </td>
             <td>
@@ -3313,8 +3311,7 @@ work items without executing them.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Generate static work items on a TOP node without cooking them.</p>
-<p>Useful for previewing what work items will be created before running the graph.</p>
+        <p>Generate static work items on a TOP node without cooking.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3353,7 +3350,7 @@ work items without executing them.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to the TOP node.</p>
+                <p>TOP node path.</p>
               </div>
             </td>
             <td>
@@ -3386,7 +3383,6 @@ work items without executing them.</p>
     <div class="doc doc-contents ">
 
         <p>Get the PDG dependency graph structure for a TOP network.</p>
-<p>Returns all nodes and their dependency connections (edges).</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3425,7 +3421,7 @@ work items without executing them.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to a TOP network node or TOP node inside one.</p>
+                <p>TOPnet or TOP node path.</p>
               </div>
             </td>
             <td>
@@ -3457,7 +3453,7 @@ work items without executing them.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Get an overview of a TOP network including node count, scheduler info, and cook state.</p>
+        <p>Get an overview of a TOP network.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3496,7 +3492,7 @@ work items without executing them.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to a TOP network node (topnet) or a TOP node inside one.</p>
+                <p>TOPnet or TOP node path.</p>
               </div>
             </td>
             <td>
@@ -3529,8 +3525,6 @@ work items without executing them.</p>
     <div class="doc doc-contents ">
 
         <p>Get information about TOP scheduler nodes in a network.</p>
-<p>If node_path points to a scheduler, returns its details. Otherwise,
-returns info about all schedulers found in the TOP network.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3569,7 +3563,7 @@ returns info about all schedulers found in the TOP network.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to a TOP scheduler node or a TOP network.</p>
+                <p>TOP scheduler or TOPnet path.</p>
               </div>
             </td>
             <td>
@@ -3601,9 +3595,7 @@ returns info about all schedulers found in the TOP network.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Get detailed information about a specific work item on a TOP node.</p>
-<p>Returns the work item's ID, name, state, frame, priority, attributes,
-and output files.</p>
+        <p>Get detailed information about a specific work item.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3642,7 +3634,7 @@ and output files.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to the TOP node.</p>
+                <p>TOP node path.</p>
               </div>
             </td>
             <td>
@@ -3658,7 +3650,7 @@ and output files.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Index of the work item within the node.</p>
+                <p>Work item index within the node.</p>
               </div>
             </td>
             <td>
@@ -3690,9 +3682,7 @@ and output files.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Get the count of work items in each state for a TOP node.</p>
-<p>States include: waiting, scheduled, cooking, cooked_success,
-cooked_fail, cooked_cancel, etc.</p>
+        <p>Get work item state counts for a TOP node.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3731,7 +3721,7 @@ cooked_fail, cooked_cancel, etc.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to the TOP node.</p>
+                <p>TOP node path.</p>
               </div>
             </td>
             <td>
@@ -3802,7 +3792,7 @@ cooked_fail, cooked_cancel, etc.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Path to a TOP node or TOP network.</p>
+                <p>TOP node or TOPnet path.</p>
               </div>
             </td>
             <td>
@@ -3846,7 +3836,7 @@ cooked_fail, cooked_cancel, etc.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 22, 2026 19:49:08 UTC">February 22, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 22, 2026 20:29:30 UTC">February 22, 2026</span>
   </span>
 
     
@@ -3856,7 +3846,7 @@ cooked_fail, cooked_cancel, etc.</p>
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 22, 2026 19:49:08 UTC">February 22, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 22, 2026 20:29:30 UTC">February 22, 2026</span>
   </span>
 
     

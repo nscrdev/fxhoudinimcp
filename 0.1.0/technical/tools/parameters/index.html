@@ -3041,7 +3041,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.parameters.create_spare_parameter&lt;/code&gt;)" href="#fxhoudinimcp.tools.parameters.create_spare_parameter">create_spare_parameter</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Add a custom spare parameter to a Houdini node.</p>
+                  <p>Add a spare parameter to a node.</p>
                 </div>
               </td>
             </tr>
@@ -3054,7 +3054,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.parameters.get_expression&lt;/code&gt;)" href="#fxhoudinimcp.tools.parameters.get_expression">get_expression</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Get the current expression on a Houdini parameter.</p>
+                  <p>Get the expression on a parameter.</p>
                 </div>
               </td>
             </tr>
@@ -3067,7 +3067,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.parameters.get_parameter&lt;/code&gt;)" href="#fxhoudinimcp.tools.parameters.get_parameter">get_parameter</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Get the current value and metadata of a Houdini parameter.</p>
+                  <p>Get the value and metadata of a parameter.</p>
                 </div>
               </td>
             </tr>
@@ -3080,7 +3080,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.parameters.get_parameter_schema&lt;/code&gt;)" href="#fxhoudinimcp.tools.parameters.get_parameter_schema">get_parameter_schema</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Get the full template schema for parameter(s) on a Houdini node.</p>
+                  <p>Get the template schema for parameter(s) on a node.</p>
                 </div>
               </td>
             </tr>
@@ -3106,7 +3106,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.parameters.lock_parameter&lt;/code&gt;)" href="#fxhoudinimcp.tools.parameters.lock_parameter">lock_parameter</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Lock or unlock a Houdini parameter.</p>
+                  <p>Lock or unlock a parameter.</p>
                 </div>
               </td>
             </tr>
@@ -3119,7 +3119,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.parameters.revert_parameter&lt;/code&gt;)" href="#fxhoudinimcp.tools.parameters.revert_parameter">revert_parameter</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Revert a Houdini parameter to its default value.</p>
+                  <p>Revert a parameter to its default value.</p>
                 </div>
               </td>
             </tr>
@@ -3132,7 +3132,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.parameters.set_expression&lt;/code&gt;)" href="#fxhoudinimcp.tools.parameters.set_expression">set_expression</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Set an expression on a Houdini parameter.</p>
+                  <p>Set an expression on a parameter.</p>
                 </div>
               </td>
             </tr>
@@ -3145,7 +3145,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.parameters.set_parameter&lt;/code&gt;)" href="#fxhoudinimcp.tools.parameters.set_parameter">set_parameter</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Set a single Houdini parameter value.</p>
+                  <p>Set a parameter value.</p>
                 </div>
               </td>
             </tr>
@@ -3158,7 +3158,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
   &lt;/span&gt; (&lt;code&gt;fxhoudinimcp.tools.parameters.set_parameters&lt;/code&gt;)" href="#fxhoudinimcp.tools.parameters.set_parameters">set_parameters</a></code></td>
               <td>
                 <div class="doc-md-description">
-                  <p>Batch-set multiple parameters on a single Houdini node.</p>
+                  <p>Batch-set multiple parameters on a node.</p>
                 </div>
               </td>
             </tr>
@@ -3206,8 +3206,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Add a custom spare parameter to a Houdini node.</p>
-<p>Supported parameter types: "float", "int", "string", "toggle", "menu".</p>
+        <p>Add a spare parameter to a node.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3230,7 +3229,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Absolute Houdini node path.</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -3246,7 +3245,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Internal name for the new parameter.</p>
+                <p>Internal parameter name.</p>
               </div>
             </td>
             <td>
@@ -3262,7 +3261,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Parameter type (float, int, string, toggle, menu).</p>
+                <p>"float", "int", "string", "toggle", or "menu".</p>
               </div>
             </td>
             <td>
@@ -3278,7 +3277,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Human-readable label shown in the UI.</p>
+                <p>UI label.</p>
               </div>
             </td>
             <td>
@@ -3294,8 +3293,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Default value. For float/int can be a number or list.
-           For toggle, a bool. For menu, a list of menu item strings.</p>
+                <p>Default value.</p>
               </div>
             </td>
             <td>
@@ -3311,7 +3309,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Optional minimum value (float/int types only).</p>
+                <p>Minimum value (float/int only).</p>
               </div>
             </td>
             <td>
@@ -3327,7 +3325,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Optional maximum value (float/int types only).</p>
+                <p>Maximum value (float/int only).</p>
               </div>
             </td>
             <td>
@@ -3359,9 +3357,7 @@ references, locking, schema inspection, and spare parameter creation.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Get the current expression on a Houdini parameter.</p>
-<p>Returns the expression string and its language, or null values if the
-parameter has no expression.</p>
+        <p>Get the expression on a parameter.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3384,7 +3380,7 @@ parameter has no expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Absolute Houdini node path.</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -3400,7 +3396,7 @@ parameter has no expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Name of the parameter.</p>
+                <p>Parameter name.</p>
               </div>
             </td>
             <td>
@@ -3432,9 +3428,7 @@ parameter has no expression.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Get the current value and metadata of a Houdini parameter.</p>
-<p>Returns the evaluated value, raw value, any expression, keyframe count,
-lock state, whether the parameter is at its default, and the parameter type.</p>
+        <p>Get the value and metadata of a parameter.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3457,7 +3451,7 @@ lock state, whether the parameter is at its default, and the parameter type.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Absolute Houdini node path (e.g. "/obj/geo1/transform1").</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -3473,7 +3467,7 @@ lock state, whether the parameter is at its default, and the parameter type.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Name of the parameter (e.g. "tx", "divisions").</p>
+                <p>Parameter name.</p>
               </div>
             </td>
             <td>
@@ -3507,10 +3501,7 @@ lock state, whether the parameter is at its default, and the parameter type.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Get the full template schema for parameter(s) on a Houdini node.</p>
-<p>Returns type, range, menu items, default value, conditionals, and tags.
-If parm_name is omitted, returns schema information for every parameter
-on the node.</p>
+        <p>Get the template schema for parameter(s) on a node.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3533,7 +3524,7 @@ on the node.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Absolute Houdini node path.</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -3549,7 +3540,7 @@ on the node.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Optional parameter name. If None, returns all parameters.</p>
+                <p>Parameter name. If None, returns all parameters.</p>
               </div>
             </td>
             <td>
@@ -3588,8 +3579,6 @@ on the node.</p>
     <div class="doc doc-contents ">
 
         <p>Create a channel reference from one parameter to another.</p>
-<p>The destination parameter will reference the source parameter via
-an HScript ch() expression.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3612,7 +3601,7 @@ an HScript ch() expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Absolute path of the source node.</p>
+                <p>Source node path.</p>
               </div>
             </td>
             <td>
@@ -3628,7 +3617,7 @@ an HScript ch() expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Parameter name on the source node.</p>
+                <p>Source parameter name.</p>
               </div>
             </td>
             <td>
@@ -3644,7 +3633,7 @@ an HScript ch() expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Absolute path of the destination node.</p>
+                <p>Destination node path.</p>
               </div>
             </td>
             <td>
@@ -3660,7 +3649,7 @@ an HScript ch() expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Parameter name on the destination node.</p>
+                <p>Destination parameter name.</p>
               </div>
             </td>
             <td>
@@ -3694,8 +3683,7 @@ an HScript ch() expression.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Lock or unlock a Houdini parameter.</p>
-<p>Locked parameters cannot be edited by users in the UI.</p>
+        <p>Lock or unlock a parameter.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3718,7 +3706,7 @@ an HScript ch() expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Absolute Houdini node path.</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -3734,7 +3722,7 @@ an HScript ch() expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Name of the parameter.</p>
+                <p>Parameter name.</p>
               </div>
             </td>
             <td>
@@ -3782,8 +3770,7 @@ an HScript ch() expression.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Revert a Houdini parameter to its default value.</p>
-<p>Removes any expression or keyframes and restores the factory default.</p>
+        <p>Revert a parameter to its default value.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3806,7 +3793,7 @@ an HScript ch() expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Absolute Houdini node path.</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -3822,7 +3809,7 @@ an HScript ch() expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Name of the parameter to revert.</p>
+                <p>Parameter name.</p>
               </div>
             </td>
             <td>
@@ -3860,7 +3847,7 @@ an HScript ch() expression.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Set an expression on a Houdini parameter.</p>
+        <p>Set an expression on a parameter.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3883,7 +3870,7 @@ an HScript ch() expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Absolute Houdini node path.</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -3899,7 +3886,7 @@ an HScript ch() expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Name of the parameter.</p>
+                <p>Parameter name.</p>
               </div>
             </td>
             <td>
@@ -3915,7 +3902,7 @@ an HScript ch() expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The expression string (e.g. "$F", "ch('../tx')").</p>
+                <p>Expression string.</p>
               </div>
             </td>
             <td>
@@ -3931,7 +3918,7 @@ an HScript ch() expression.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Expression language, "hscript" (default) or "python".</p>
+                <p>"hscript" (default) or "python".</p>
               </div>
             </td>
             <td>
@@ -3963,9 +3950,7 @@ an HScript ch() expression.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Set a single Houdini parameter value.</p>
-<p>The value type is auto-detected (int, float, string, etc.) and applied
-to the parameter.</p>
+        <p>Set a parameter value.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -3988,7 +3973,7 @@ to the parameter.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Absolute Houdini node path.</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -4004,7 +3989,7 @@ to the parameter.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Name of the parameter to set.</p>
+                <p>Parameter name.</p>
               </div>
             </td>
             <td>
@@ -4020,7 +4005,7 @@ to the parameter.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The new value (int, float, string, bool, or list for tuples).</p>
+                <p>New value (int, float, string, bool, or list).</p>
               </div>
             </td>
             <td>
@@ -4052,9 +4037,7 @@ to the parameter.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Batch-set multiple parameters on a single Houdini node.</p>
-<p>More efficient than calling set_parameter repeatedly. Reports individual
-successes and failures.</p>
+        <p>Batch-set multiple parameters on a node.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -4077,7 +4060,7 @@ successes and failures.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Absolute Houdini node path.</p>
+                <p>Node path.</p>
               </div>
             </td>
             <td>
@@ -4093,7 +4076,7 @@ successes and failures.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>Mapping of parameter names to their new values.</p>
+                <p>Mapping of parameter names to values.</p>
               </div>
             </td>
             <td>
@@ -4137,7 +4120,7 @@ successes and failures.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 22, 2026 19:49:08 UTC">February 22, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 22, 2026 20:29:30 UTC">February 22, 2026</span>
   </span>
 
     
@@ -4147,7 +4130,7 @@ successes and failures.</p>
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 22, 2026 19:49:08 UTC">February 22, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="February 22, 2026 20:29:30 UTC">February 22, 2026</span>
   </span>
 
     
