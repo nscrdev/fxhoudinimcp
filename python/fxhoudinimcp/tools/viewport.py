@@ -117,6 +117,25 @@ async def frame_all(
 
 
 @mcp.tool()
+async def set_viewport_direction(
+    ctx: Context,
+    direction: str,
+    pane_name: str | None = None,
+) -> dict:
+    """Set the viewport to a standard viewing direction.
+
+    Args:
+        direction: "front", "back", "top", "bottom", "left", "right", or "perspective".
+        pane_name: Pane tab name.
+    """
+    bridge = _get_bridge(ctx)
+    params: dict[str, Any] = {"direction": direction}
+    if pane_name is not None:
+        params["pane_name"] = pane_name
+    return await bridge.execute("viewport.set_viewport_direction", params)
+
+
+@mcp.tool()
 async def capture_screenshot(
     ctx: Context,
     output_path: str,

@@ -7,7 +7,7 @@ via the HTTP bridge.
 from __future__ import annotations
 
 # Built-in
-from typing import Optional
+from typing import Any, Optional
 
 # Third-party
 from mcp.server.fastmcp import Context
@@ -222,6 +222,25 @@ async def connect_nodes(
             "output_index": output_index,
             "input_index": input_index,
         },
+    )
+
+
+@mcp.tool()
+async def connect_nodes_batch(
+    ctx: Context,
+    connections: list[dict[str, Any]],
+) -> dict:
+    """Connect multiple node pairs in a single call.
+
+    Args:
+        connections: List of connections. Each dict has keys:
+            source_path (str), dest_path (str),
+            output_index (int, default 0), input_index (int, default 0).
+    """
+    bridge = _get_bridge(ctx)
+    return await bridge.execute(
+        "nodes.connect_nodes_batch",
+        {"connections": connections},
     )
 
 

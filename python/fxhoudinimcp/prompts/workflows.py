@@ -8,6 +8,16 @@ from __future__ import annotations
 # Internal
 from fxhoudinimcp.server import mcp
 
+# Shared guidelines appended to every workflow prompt.
+_NETWORK_HOUSEKEEPING = """
+Network housekeeping (ALWAYS follow these):
+- Call set_current_network on the parent network you are building in so the
+  user can see your work in the network editor. Do this BEFORE you start
+  creating nodes, and again whenever you move to a different network level.
+- Call layout_children frequently — after every batch of 3-5 new nodes, not
+  just at the end. A tidy graph lets the user follow along in real time.
+"""
+
 
 @mcp.prompt()
 def procedural_modeling_workflow(
@@ -37,12 +47,46 @@ Workflow:
 5. Use get_geometry_info to verify the result.
 6. Use layout_children to clean up the network.
 
-Tips:
+VEX Wrangle rules (IMPORTANT):
+- After EVERY create_wrangle or set_wrangle_code call, IMMEDIATELY call
+  validate_vex on the node to catch compilation errors before anything else.
+  Do NOT rely on get_geometry_info to detect VEX problems — it won't show
+  syntax errors, only the (empty/stale) geometry output.
+- Channel references from a SOP wrangle to spare parameters on the parent
+  Geometry node use ONE level up: ch("../parm_name") or chs("../parm_name").
+  Two levels (../../) escapes to /obj which is almost always wrong.
+  When in doubt, use absolute paths: ch("/obj/geo_name/parm_name").
+- Detail-mode wrangles ("Run Over: Detail") can create geometry from scratch
+  with addpoint() / addprim() — they do NOT need input geometry. Never add a
+  dummy input point just to make a Detail wrangle work.
+- VEX ch()/chi()/chf() return 0 silently when the channel path is wrong.
+  If a loop produces 0 iterations, the channel path is likely incorrect —
+  verify the path, don't restructure the approach.
+
+Debugging strategy — avoid loops:
+- If something doesn't work after 2 attempts, STOP and change strategy:
+  1. Call validate_vex to check for VEX compilation errors.
+  2. Use execute_python to directly inspect live parameter values, e.g.
+     hou.parm("/obj/geo/parm").eval(), to confirm channels resolve.
+  3. Check find_error_nodes to see if upstream nodes have errors.
+- Do NOT keep re-running get_geometry_info hoping for different results.
+- Do NOT add workarounds (dummy inputs, extra nodes) for problems you
+  haven't diagnosed — find the root cause first.
+
+Efficiency tips:
+- Use create_spare_parameters (plural) to batch-create all spare parameters in
+  one call, with an optional folder_name to group them in a tab.
+  Do NOT call create_spare_parameter 15 times — batch them.
+- Use connect_nodes_batch to wire multiple node pairs in one call instead of
+  calling connect_nodes repeatedly.
+- Use set_viewport_direction to switch to front/top/perspective views.
+
+General tips:
 - Check node cooking errors with get_node_info after creating nodes
 - Use list_node_types with context="Sop" to discover available node types
 - Paginate point data with get_points (start/count) for large geometry
 - Use get_parameter_schema to understand node parameters before setting them
-"""
+{_NETWORK_HOUSEKEEPING}"""
 
 
 @mcp.prompt()
@@ -76,7 +120,7 @@ Key concepts:
 - Use get_usd_layers to understand the layer stack
 - Use get_usd_composition to inspect references, payloads, and variants
 - The display flag determines which node's output is viewed
-"""
+{_NETWORK_HOUSEKEEPING}"""
 
 
 @mcp.prompt()
@@ -113,7 +157,7 @@ Tips:
 - Use reset_simulation when changing fundamental parameters
 - Check get_sim_memory_usage for large simulations
 - Use list_node_types with context="Dop" to discover available node types
-"""
+{_NETWORK_HOUSEKEEPING}"""
 
 
 @mcp.prompt()
@@ -145,7 +189,7 @@ Tips:
 - Use list_node_types with context="Top" to discover available node types
 - Check get_top_scheduler_info for scheduler configuration
 - Use dirty_work_items to regenerate items after parameter changes
-"""
+{_NETWORK_HOUSEKEEPING}"""
 
 
 @mcp.prompt()
@@ -167,7 +211,8 @@ Context: {context}
 Workflow:
 1. Create a subnet node to hold the internal logic.
 2. Build the internal network with the required functionality.
-3. Promote internal parameters to the subnet level using create_spare_parameter.
+3. Promote internal parameters to the subnet level using create_spare_parameters
+   (plural, batch tool) with a folder_name to group them in a tab.
 4. Test the network thoroughly using get_geometry_info or get_stage_info.
 5. Use create_hda to convert the subnet into an HDA.
 6. Use get_hda_info to verify the definition.
@@ -179,7 +224,7 @@ Tips:
 - Use list_node_types to verify the HDA type name is unique
 - Test with different inputs before finalizing the HDA
 - Use update_hda to save changes after modifications
-"""
+{_NETWORK_HOUSEKEEPING}"""
 
 
 @mcp.prompt()
@@ -212,4 +257,4 @@ Common issues:
 - Wrong parameter values: compare with get_parameter_schema defaults
 - Cooking errors: check upstream nodes first (data flows top to bottom)
 - Memory issues: get_sim_memory_usage, get_geometry_info for polygon counts
-"""
+{_NETWORK_HOUSEKEEPING}"""

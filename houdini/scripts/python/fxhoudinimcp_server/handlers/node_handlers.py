@@ -33,6 +33,21 @@ def _node_summary(node: hou.Node) -> dict:
     }
 
 
+def _focus_network_editor(node: hou.Node) -> None:
+    """Best-effort: pan the network editor to *node* so the user sees it."""
+    try:
+        for pane_tab in hou.ui.paneTabs():
+            if pane_tab.type() == hou.paneTabType.NetworkEditor:
+                parent = node.parent()
+                if parent is not None:
+                    pane_tab.cd(parent.path())
+                pane_tab.setCurrentNode(node)
+                pane_tab.homeToSelection()
+                return
+    except Exception:
+        pass  # Never let UI helpers break a tool call
+
+
 ###### nodes.create_node
 
 def create_node(
@@ -60,6 +75,8 @@ def create_node(
 
     if position is not None and len(position) >= 2:
         node.setPosition(hou.Vector2(position[0], position[1]))
+
+    _focus_network_editor(node)
 
     return {
         "success": True,
@@ -424,12 +441,62 @@ def connect_nodes(
 
     dest.setInput(input_index, source, output_index)
 
+    _focus_network_editor(dest)
+
     return {
         "success": True,
         "source_path": source.path(),
         "dest_path": dest.path(),
         "output_index": output_index,
         "input_index": input_index,
+    }
+
+
+###### nodes.connect_nodes_batch
+
+def connect_nodes_batch(
+    connections: list,
+) -> dict:
+    """Wire multiple node pairs in a single call.
+
+    Args:
+        connections: List of dicts, each with keys:
+            source_path, dest_path, output_index (default 0), input_index (default 0).
+    """
+    results = []
+    errors = []
+
+    last_dest = None
+    for conn in connections:
+        src_path = conn["source_path"]
+        dst_path = conn["dest_path"]
+        out_idx = int(conn.get("output_index", 0))
+        in_idx = int(conn.get("input_index", 0))
+        try:
+            source = _get_node(src_path)
+            dest = _get_node(dst_path)
+            dest.setInput(in_idx, source, out_idx)
+            last_dest = dest
+            results.append({
+                "source_path": source.path(),
+                "dest_path": dest.path(),
+                "output_index": out_idx,
+                "input_index": in_idx,
+            })
+        except Exception as exc:
+            errors.append({
+                "source_path": src_path,
+                "dest_path": dst_path,
+                "error": str(exc),
+            })
+
+    if last_dest is not None:
+        _focus_network_editor(last_dest)
+
+    return {
+        "success": len(errors) == 0,
+        "connected": results,
+        "errors": errors,
     }
 
 
@@ -574,6 +641,9 @@ def set_node_flags(
             "the node does not support the requested flags."
         )
 
+    if changed.get("display"):
+        _focus_network_editor(node)
+
     return {
         "success": True,
         "node_path": node_path,
@@ -660,6 +730,7 @@ register_handler("nodes.list_children", list_children)
 register_handler("nodes.find_nodes", find_nodes)
 register_handler("nodes.list_node_types", list_node_types)
 register_handler("nodes.connect_nodes", connect_nodes)
+register_handler("nodes.connect_nodes_batch", connect_nodes_batch)
 register_handler("nodes.disconnect_node", disconnect_node)
 register_handler("nodes.reorder_inputs", reorder_inputs)
 register_handler("nodes.set_node_flags", set_node_flags)

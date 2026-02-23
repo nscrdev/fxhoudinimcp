@@ -18,6 +18,18 @@ import hou
 from fxhoudinimcp_server.dispatcher import register_handler
 
 
+def _menu_index_by_label(parm: hou.Parm, label_substring: str) -> int | None:
+    """Find a menu parameter's index whose label contains *label_substring*."""
+    template = parm.parmTemplate()
+    labels = list(template.menuLabels())
+    items = list(template.menuItems())
+    target = label_substring.lower()
+    for idx, label in enumerate(labels):
+        if target in label.lower():
+            return int(items[idx]) if items[idx].isdigit() else idx
+    return None
+
+
 ###### Helpers
 
 def _get_node(node_path: str) -> hou.Node:
@@ -296,7 +308,9 @@ def _write_cache(
         # Try to set trange to "custom" or specific frame range parms
         trange_parm = node.parm("trange")
         if trange_parm is not None:
-            trange_parm.set(1)  # 1 = "Render Specific Frame Range"
+            # Resolve menu index dynamically (avoids version-specific hardcoding)
+            trange_idx = _menu_index_by_label(trange_parm, "specific frame")
+            trange_parm.set(trange_idx if trange_idx is not None else 1)
 
         f1_parm = node.parm("f1")
         f2_parm = node.parm("f2")

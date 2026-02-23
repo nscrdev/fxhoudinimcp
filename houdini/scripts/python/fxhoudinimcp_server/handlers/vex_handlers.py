@@ -23,20 +23,91 @@ def _get_node(node_path: str) -> hou.Node:
     return node
 
 
-# Map of human-readable run_over values to the attribwrangle class parm values
-_RUN_OVER_MAP = {
-    "Points": 0,
-    "points": 0,
-    "Vertices": 1,
-    "vertices": 1,
-    "Primitives": 2,
-    "primitives": 2,
-    "prims": 2,
-    "Detail": 3,
-    "detail": 3,
-    "Numbers": 4,
-    "numbers": 4,
-}
+def _validate_vex_quick(node: hou.Node) -> dict:
+    """Cook a wrangle node and return any VEX errors/warnings."""
+    try:
+        node.cook(force=True)
+    except hou.OperationFailed:
+        pass
+
+    errors = []
+    warnings = []
+    try:
+        errors = list(node.errors() or [])
+    except Exception:
+        pass
+    try:
+        warnings = list(node.warnings() or [])
+    except Exception:
+        pass
+
+    return {
+        "vex_valid": len(errors) == 0,
+        "vex_errors": errors,
+        "vex_warnings": warnings,
+    }
+
+
+def _resolve_class_value(node: hou.Node, run_over: str) -> int:
+    """Resolve a run_over string to the correct menu index on this node.
+
+    Reads the ``class`` parameter's menu labels dynamically so the mapping
+    is always correct regardless of Houdini version.
+    """
+    class_parm = node.parm("class")
+    if class_parm is None:
+        raise ValueError(
+            f"Node {node.path()} has no 'class' parameter — "
+            "is it an Attribute Wrangle?"
+        )
+
+    template = class_parm.parmTemplate()
+    labels = list(template.menuLabels())
+    items = list(template.menuItems())
+
+    # Try exact match first (case-insensitive), then substring match
+    target = run_over.strip().lower()
+    for idx, label in enumerate(labels):
+        if label.lower() == target:
+            return int(items[idx]) if items[idx].isdigit() else idx
+    for idx, label in enumerate(labels):
+        if target in label.lower():
+            return int(items[idx]) if items[idx].isdigit() else idx
+
+    raise ValueError(
+        f"Invalid run_over value '{run_over}'. "
+        f"Available options: {labels}"
+    )
+
+
+def _reverse_class_label(node: hou.Node) -> str | None:
+    """Return the human-readable label for the current class value."""
+    class_parm = node.parm("class")
+    if class_parm is None:
+        return None
+    value = class_parm.eval()
+    template = class_parm.parmTemplate()
+    labels = list(template.menuLabels())
+    items = list(template.menuItems())
+    for idx, item in enumerate(items):
+        if (item.isdigit() and int(item) == value) or idx == value:
+            return labels[idx] if idx < len(labels) else str(value)
+    return str(value)
+
+
+def _focus_network_editor(node: hou.Node) -> None:
+    """Best-effort: pan the network editor to *node* so the user sees it."""
+    try:
+        for pane_tab in hou.ui.paneTabs():
+            if pane_tab.type() == hou.paneTabType.NetworkEditor:
+                parent = node.parent()
+                if parent is not None:
+                    pane_tab.cd(parent.path())
+                pane_tab.setCurrentNode(node)
+                pane_tab.homeToSelection()
+                return
+    except Exception:
+        pass
 
 
 ###### vex.create_wrangle
@@ -77,25 +148,21 @@ def create_wrangle(
         )
     snippet_parm.set(vex_code)
 
-    # Set the run_over class
-    class_value = _RUN_OVER_MAP.get(run_over)
-    if class_value is None:
-        raise ValueError(
-            f"Invalid run_over value '{run_over}'. "
-            f"Must be one of: {list(set(_RUN_OVER_MAP.keys()))}"
-        )
+    # Set the run_over class (resolved dynamically from menu labels)
+    class_value = _resolve_class_value(node, run_over)
+    node.parm("class").set(class_value)
 
-    class_parm = node.parm("class")
-    if class_parm is not None:
-        class_parm.set(class_value)
+    _focus_network_editor(node)
 
-    return {
+    result = {
         "success": True,
         "node_path": node.path(),
         "node_name": node.name(),
         "run_over": run_over,
         "vex_code": vex_code,
     }
+    result.update(_validate_vex_quick(node))
+    return result
 
 
 ###### vex.set_wrangle_code
@@ -118,11 +185,13 @@ def set_wrangle_code(node_path: str, vex_code: str) -> dict:
 
     snippet_parm.set(vex_code)
 
-    return {
+    result = {
         "success": True,
         "node_path": node.path(),
         "vex_code": vex_code,
     }
+    result.update(_validate_vex_quick(node))
+    return result
 
 
 ###### vex.get_wrangle_code
@@ -144,13 +213,8 @@ def get_wrangle_code(node_path: str) -> dict:
 
     vex_code = snippet_parm.eval()
 
-    # Also get the run_over class
-    run_over = None
-    class_parm = node.parm("class")
-    if class_parm is not None:
-        class_value = class_parm.eval()
-        reverse_map = {v: k for k, v in _RUN_OVER_MAP.items() if k[0].isupper()}
-        run_over = reverse_map.get(class_value, str(class_value))
+    # Also get the run_over class (resolved dynamically from menu labels)
+    run_over = _reverse_class_label(node)
 
     return {
         "node_path": node.path(),

@@ -511,3 +511,129 @@ def _create_spare_parameter(
 
 
 register_handler("parameters.create_spare_parameter", _create_spare_parameter)
+
+
+###### Handler: parameters.create_spare_parameters
+
+
+def _build_parm_template(spec: dict) -> hou.ParmTemplate:
+    """Build a single ParmTemplate from a specification dict."""
+    type_map: dict[str, type] = {
+        "float": hou.FloatParmTemplate,
+        "int": hou.IntParmTemplate,
+        "string": hou.StringParmTemplate,
+        "toggle": hou.ToggleParmTemplate,
+        "menu": hou.MenuParmTemplate,
+    }
+
+    parm_name = spec["parm_name"]
+    parm_type = spec["parm_type"].lower()
+    label = spec["label"]
+    default_value = spec.get("default_value")
+    min_val = spec.get("min_val")
+    max_val = spec.get("max_val")
+
+    template_cls = type_map.get(parm_type)
+    if template_cls is None:
+        raise ValueError(
+            f"Unsupported parm_type '{parm_type}' for parameter '{parm_name}'."
+        )
+
+    kwargs: dict[str, Any] = {}
+
+    if template_cls in (hou.FloatParmTemplate, hou.IntParmTemplate):
+        _cast = int if template_cls is hou.IntParmTemplate else float
+        if default_value is not None:
+            if not isinstance(default_value, (list, tuple)):
+                default_value = [default_value]
+            kwargs["num_components"] = len(default_value)
+            kwargs["default_value"] = tuple(_cast(v) for v in default_value)
+        else:
+            kwargs["num_components"] = 1
+        if min_val is not None:
+            kwargs["min"] = _cast(min_val)
+            kwargs["min_is_strict"] = False
+        if max_val is not None:
+            kwargs["max"] = _cast(max_val)
+            kwargs["max_is_strict"] = False
+        return template_cls(parm_name, label, **kwargs)
+
+    if template_cls is hou.StringParmTemplate:
+        kwargs["num_components"] = 1
+        if default_value is not None:
+            if not isinstance(default_value, (list, tuple)):
+                default_value = [default_value]
+            kwargs["default_value"] = tuple(str(v) for v in default_value)
+        return template_cls(parm_name, label, **kwargs)
+
+    if template_cls is hou.ToggleParmTemplate:
+        dv = bool(default_value) if default_value is not None else False
+        return template_cls(parm_name, label, default_value=dv)
+
+    if template_cls is hou.MenuParmTemplate:
+        items = (
+            default_value if isinstance(default_value, (list, tuple)) else []
+        )
+        return template_cls(
+            parm_name,
+            label,
+            menu_items=tuple(str(i) for i in items),
+            menu_labels=tuple(str(i) for i in items),
+        )
+
+    return template_cls(parm_name, label, **kwargs)
+
+
+_FOLDER_TYPE_MAP = {
+    "Tabs": hou.folderType.Tabs,
+    "tabs": hou.folderType.Tabs,
+    "Collapsible": hou.folderType.Collapsible,
+    "collapsible": hou.folderType.Collapsible,
+    "Simple": hou.folderType.Simple,
+    "simple": hou.folderType.Simple,
+}
+
+
+def _create_spare_parameters(
+    node_path: str,
+    parameters: list,
+    folder_name: str | None = None,
+    folder_type: str = "Tabs",
+    **_: Any,
+) -> dict[str, Any]:
+    """Batch-create spare parameters, optionally inside a folder/tab."""
+    node = _resolve_node(node_path)
+
+    templates = []
+    created = []
+    for spec in parameters:
+        pt = _build_parm_template(spec)
+        templates.append(pt)
+        created.append(spec["parm_name"])
+
+    ptg = node.parmTemplateGroup()
+
+    if folder_name is not None:
+        ft = _FOLDER_TYPE_MAP.get(folder_type, hou.folderType.Tabs)
+        folder = hou.FolderParmTemplate(
+            folder_name.lower().replace(" ", "_"),
+            folder_name,
+            parm_templates=templates,
+            folder_type=ft,
+        )
+        ptg.addParmTemplate(folder)
+    else:
+        for pt in templates:
+            ptg.addParmTemplate(pt)
+
+    node.setParmTemplateGroup(ptg)
+
+    return {
+        "node_path": node_path,
+        "created": created,
+        "count": len(created),
+        "folder_name": folder_name,
+    }
+
+
+register_handler("parameters.create_spare_parameters", _create_spare_parameters)

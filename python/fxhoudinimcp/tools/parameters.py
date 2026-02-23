@@ -255,3 +255,32 @@ async def create_spare_parameter(
     if max_val is not None:
         payload["max_val"] = max_val
     return await bridge.execute("parameters.create_spare_parameter", payload)
+
+
+@mcp.tool()
+async def create_spare_parameters(
+    ctx: Context,
+    node_path: str,
+    parameters: list[dict[str, Any]],
+    folder_name: str | None = None,
+    folder_type: str = "Tabs",
+) -> dict:
+    """Batch-create multiple spare parameters in one call, optionally in a folder tab.
+
+    Args:
+        node_path: Node path.
+        parameters: List of parameter specs. Each dict has keys:
+            parm_name (str), parm_type (str: "float"/"int"/"string"/"toggle"/"menu"),
+            label (str), default_value (optional), min_val (optional), max_val (optional).
+        folder_name: If provided, wraps all parameters in a named folder tab.
+        folder_type: Folder style: "Tabs", "Collapsible", or "Simple".
+    """
+    bridge = _get_bridge(ctx)
+    payload: dict[str, Any] = {
+        "node_path": node_path,
+        "parameters": parameters,
+    }
+    if folder_name is not None:
+        payload["folder_name"] = folder_name
+        payload["folder_type"] = folder_type
+    return await bridge.execute("parameters.create_spare_parameters", payload)

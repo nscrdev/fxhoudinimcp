@@ -202,6 +202,49 @@ def set_viewport_display(
     }
 
 
+###### viewport.set_viewport_direction
+
+def set_viewport_direction(
+    direction: str,
+    pane_name: str = None,
+) -> dict:
+    """Set the viewport to a standard viewing direction.
+
+    Args:
+        direction: One of 'front', 'back', 'top', 'bottom', 'left', 'right',
+            'perspective'.
+        pane_name: Optional pane tab name.
+    """
+    direction_map = {
+        "front": hou.geometryViewportType.Front,
+        "back": hou.geometryViewportType.Back,
+        "top": hou.geometryViewportType.Top,
+        "bottom": hou.geometryViewportType.Bottom,
+        "left": hou.geometryViewportType.Left,
+        "right": hou.geometryViewportType.Right,
+        "perspective": hou.geometryViewportType.Perspective,
+    }
+
+    view_type = direction_map.get(direction.lower())
+    if view_type is None:
+        raise ValueError(
+            f"Unknown direction '{direction}'. "
+            f"Supported: {list(direction_map.keys())}"
+        )
+
+    scene_viewer = _find_scene_viewer(pane_name)
+    viewport = scene_viewer.curViewport()
+    viewport.changeType(view_type)
+    viewport.frameAll()
+
+    return {
+        "success": True,
+        "direction": direction,
+        "pane_name": scene_viewer.name(),
+        "viewport_name": viewport.name(),
+    }
+
+
 ###### viewport.frame_selection
 
 def frame_selection(pane_name: str = None) -> dict:
@@ -514,6 +557,7 @@ register_handler("viewport.list_panes", list_panes)
 register_handler("viewport.get_viewport_info", get_viewport_info)
 register_handler("viewport.set_viewport_camera", set_viewport_camera)
 register_handler("viewport.set_viewport_display", set_viewport_display)
+register_handler("viewport.set_viewport_direction", set_viewport_direction)
 register_handler("viewport.frame_selection", frame_selection)
 register_handler("viewport.frame_all", frame_all)
 register_handler("viewport.capture_screenshot", capture_screenshot)
