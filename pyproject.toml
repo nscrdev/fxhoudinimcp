@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "fxhoudinimcp"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Comprehensive MCP server for SideFX Houdini with 131 tools covering SOPs, LOPs/USD, DOPs, PDG/TOPs, COPs, HDAs, animation, rendering, VEX, and more"
 readme = "README.md"
 license = { text = "MIT" }
@@ -55,6 +55,15 @@ Homepage = "https://github.com/healkeiser/fxhoudinimcp"
 Documentation = "https://healkeiser.github.io/fxhoudinimcp"
 Repository = "https://github.com/healkeiser/fxhoudinimcp"
 Issues = "https://github.com/healkeiser/fxhoudinimcp/issues"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+version_scheme = "no-guess-dev"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "python/fxhoudinimcp/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["python/fxhoudinimcp"]
