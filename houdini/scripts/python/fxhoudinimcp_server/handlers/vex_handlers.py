@@ -6,6 +6,9 @@ in Attribute Wrangle nodes and VEX expressions.
 
 from __future__ import annotations
 
+# Built-in
+import re
+
 # Third-party
 import hou
 
@@ -112,6 +115,23 @@ def _focus_network_editor(node: hou.Node) -> None:
         pass
 
 
+# Regex pattern for detecting absolute channel paths in VEX code
+_RE_ABS_CH = re.compile(r'ch[sfiv]?\s*\(\s*["\']/')
+
+
+def _check_channel_paths(vex_code: str) -> list[str]:
+    """Return warnings if the VEX code contains absolute channel refs."""
+    warnings = []
+    if _RE_ABS_CH.search(vex_code):
+        warnings.append(
+            "VEX contains absolute channel path (ch(\"/...\")). "
+            "Prefer relative paths — use ../parm_name to reach the "
+            "immediate parent, ../../parm_name for two levels up, etc. "
+            "Absolute paths break when nodes are renamed or moved."
+        )
+    return warnings
+
+
 ###### vex.create_wrangle
 
 def create_wrangle(
@@ -162,8 +182,18 @@ def create_wrangle(
         "node_name": node.name(),
         "run_over": run_over,
         "vex_code": vex_code,
+        "channel_prefix": "../",
+        "channel_hint": (
+            "To reference spare parameters on the parent Geometry node, "
+            "use ch(\"../parm_name\"). Avoid absolute paths and ../../."
+        ),
     }
     result.update(_validate_vex_quick(node))
+
+    path_warnings = _check_channel_paths(vex_code)
+    if path_warnings:
+        result.setdefault("vex_warnings", []).extend(path_warnings)
+
     return result
 
 
@@ -191,8 +221,14 @@ def set_wrangle_code(node_path: str, vex_code: str) -> dict:
         "success": True,
         "node_path": node.path(),
         "vex_code": vex_code,
+        "channel_prefix": "../",
     }
     result.update(_validate_vex_quick(node))
+
+    path_warnings = _check_channel_paths(vex_code)
+    if path_warnings:
+        result.setdefault("vex_warnings", []).extend(path_warnings)
+
     return result
 
 

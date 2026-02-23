@@ -41,21 +41,53 @@ Workflow:
 3. Inside the geo node, build a SOP network:
    - Start with a base shape (box, grid, sphere, etc.)
    - Chain modifier nodes (transform, mountain, scatter, etc.)
-   - Use Attribute Wrangles for custom VEX when needed (create_wrangle tool)
-   - For complex logic, prefer VEX wrangles over Python SOPs
+   - Use Attribute Wrangles ONLY when no built-in node can do the job
 4. Set the display flag on the final node using set_node_flags.
 5. Use get_geometry_info to verify the result.
 6. Use layout_children to clean up the network.
 
-VEX Wrangle rules (IMPORTANT):
+Node-first rule (CRITICAL — read before building anything):
+- ALWAYS prefer built-in SOP nodes over VEX wrangles. Wrangles are a last
+  resort for logic that no node can express. Every wrangle you add is harder
+  to debug, slower to iterate, and invisible to the user.
+- Use list_node_types with context="Sop" to discover available nodes BEFORE
+  writing any VEX. Common nodes people forget exist:
+    - Grid / Points from Volume / Scatter — generate point grids/distributions
+    - Blast / Group / Split — filter points by attribute (e.g. @my_attr==1)
+    - Copy to Points — instance geometry to points
+    - For-Each (block_begin / block_end) — per-piece or per-point processing
+    - Add — create single points or polygons without VEX
+    - Resample / Fuse / Clean — topology cleanup
+    - Attribute Create / Attribute Randomize — set attributes without VEX
+    - Sort — reorder points/prims
+    - Transform / Peak / Mountain — deformations
+    - Group Expression — create groups with expressions, no wrangle needed
+- If you need a grid of points: use a Grid SOP (rows/columns), NOT a Detail
+  wrangle with addpoint() in a loop.
+- If you need to filter points by attribute: use a Blast SOP with a group
+  expression like "@has_ac==1", NOT a wrangle with removepoint().
+- If you need random attributes on existing points: use Attribute Randomize
+  or a short Point wrangle — never a Detail wrangle that recreates all points.
+- Only use a Detail wrangle from scratch when creating truly custom topology
+  that no combination of nodes can produce (e.g. a catenary curve equation).
+- Use set_expression or HScript expressions on node parameters for
+  procedural values (e.g. ch("../floors") on a Grid SOP's rows parameter)
+  instead of coding the same logic in VEX.
+
+VEX Wrangle rules (when you DO need a wrangle):
 - After EVERY create_wrangle or set_wrangle_code call, IMMEDIATELY call
   validate_vex on the node to catch compilation errors before anything else.
   Do NOT rely on get_geometry_info to detect VEX problems — it won't show
   syntax errors, only the (empty/stale) geometry output.
-- Channel references from a SOP wrangle to spare parameters on the parent
-  Geometry node use ONE level up: ch("../parm_name") or chs("../parm_name").
-  Two levels (../../) escapes to /obj which is almost always wrong.
-  When in doubt, use absolute paths: ch("/obj/geo_name/parm_name").
+- Channel references: strongly prefer relative paths over absolute paths.
+  Count the hierarchy depth from the wrangle to the node that owns the
+  target parameter: ../ = one level up (immediate parent), ../../ = two
+  levels up, etc. A wrangle directly inside a Geometry container uses
+  ch("../parm_name") to reach the geo node's spare parameters; a wrangle
+  inside a subnet inside the geo container uses ch("../../parm_name").
+  Absolute paths like ch("/obj/geo1/parm") break when nodes are renamed,
+  copied, or moved — only use them as a last resort.
+  The create_wrangle response includes a "channel_prefix" field — use it.
 - Detail-mode wrangles ("Run Over: Detail") can create geometry from scratch
   with addpoint() / addprim() — they do NOT need input geometry. Never add a
   dummy input point just to make a Detail wrangle work.
@@ -66,8 +98,8 @@ VEX Wrangle rules (IMPORTANT):
 Debugging strategy — avoid loops:
 - If something doesn't work after 2 attempts, STOP and change strategy:
   1. Call validate_vex to check for VEX compilation errors.
-  2. Use execute_python to directly inspect live parameter values, e.g.
-     hou.parm("/obj/geo/parm").eval(), to confirm channels resolve.
+  2. Use execute_python to inspect live parameter values, e.g.
+     hou.parm(node.path() + "/../parm_name").eval(), to confirm channels resolve.
   3. Check find_error_nodes to see if upstream nodes have errors.
 - Do NOT keep re-running get_geometry_info hoping for different results.
 - Do NOT add workarounds (dummy inputs, extra nodes) for problems you
@@ -173,6 +205,9 @@ Tips:
 - Use reset_simulation when changing fundamental parameters
 - Check get_sim_memory_usage for large simulations
 - Use list_node_types with context="Dop" to discover available node types
+- Build source geometry with built-in SOPs (Grid, Sphere, Scatter, etc.)
+  before reaching for VEX wrangles. Only use wrangles for custom logic that
+  no built-in node can express.
 {_NETWORK_HOUSEKEEPING}"""
 
 
@@ -240,6 +275,10 @@ Tips:
 - Use list_node_types to verify the HDA type name is unique
 - Test with different inputs before finalizing the HDA
 - Use update_hda to save changes after modifications
+- Build internal logic with built-in SOPs (Grid, Scatter, Copy to Points,
+  Blast, Transform, etc.) first. Only use VEX wrangles for custom logic
+  that no built-in node can express. A network of nodes is far more
+  user-friendly inside an HDA than opaque wrangles.
 {_NETWORK_HOUSEKEEPING}"""
 
 
