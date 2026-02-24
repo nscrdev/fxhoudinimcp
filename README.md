@@ -25,9 +25,11 @@
     <!-- Commit Activity -->
     <a href="https://github.com/healkeiser/fxhoudinimcp/pulse" alt="Activity">
       <img src="https://img.shields.io/github/commit-activity/m/healkeiser/fxhoudinimcp?&logo=github&label=Commit%20Activity"/></a>&nbsp;&nbsp;
-    <!-- PyPI -->
+    <!-- PyPI version -->
     <a href="https://pypi.org/project/fxhoudinimcp/">
       <img src="https://img.shields.io/pypi/v/fxhoudinimcp?logo=pypi&logoColor=white&label=PyPI" alt="PyPI"/></a>&nbsp;&nbsp;
+    <!-- PyPI downloads -->
+    <a href="https://pepy.tech/projects/fxhoudinimcp"><img src="https://static.pepy.tech/badge/fxhoudinimcp" alt="PyPI Downloads"></a> &nbsp;&nbsp;
     <!-- GitHub stars -->
     <img src="https://img.shields.io/github/stars/healkeiser/fxhoudinimcp" alt="GitHub Stars"/>&nbsp;&nbsp;
   </p>
