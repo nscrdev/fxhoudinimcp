@@ -143,10 +143,13 @@ async def list_children(
 ) -> dict:
     """List children of a network node.
 
+    Avoid `recursive=True` on large networks — it can return hundreds or
+    thousands of nodes. Prefer `find_nodes` with a specific pattern instead.
+
     Args:
         ctx: MCP context.
         parent_path: Parent network path.
-        recursive: Include all descendants.
+        recursive: Include all descendants (use sparingly on large scenes).
         filter_type: Node type filter (e.g. 'box', 'merge').
     """
     bridge = _get_bridge(ctx)
@@ -169,12 +172,17 @@ async def find_nodes(
 ) -> dict:
     """Search for nodes by name pattern, type, or context.
 
+    Narrow the search: use `inside` to limit to a specific sub-network and
+    supply at least one of `pattern`, `node_type`, or `context`. Searching
+    from `inside="/"` with no filters scans the entire scene and can return
+    hundreds of nodes.
+
     Args:
         ctx: MCP context.
         pattern: Glob pattern for node names (e.g. 'box*').
         node_type: Node type filter (e.g. 'box', 'null').
         context: Category filter (e.g. 'Sop', 'Object').
-        inside: Root path to search within.
+        inside: Root path to search within (default '/').
     """
     bridge = _get_bridge(ctx)
     params: dict = {"inside": inside}
@@ -188,15 +196,30 @@ async def find_nodes(
 
 
 @mcp.tool()
-async def list_node_types(ctx: Context, context: str) -> dict:
+async def list_node_types(
+    ctx: Context,
+    context: str,
+    filter: str | None = None,
+    limit: int = 200,
+) -> dict:
     """List available node types for a context category.
+
+    IMPORTANT: Any context can have hundreds of node types (SOPs alone can
+    exceed 800 in a production install). Always pass a `filter` keyword
+    (e.g. 'mountain', 'scatter', 'boolean') instead of dumping the full list
+    — the unfiltered response is capped at `limit` and may still be large.
 
     Args:
         ctx: MCP context.
         context: Category name (e.g. 'Sop', 'Lop', 'Dop', 'Top', 'Cop2').
+        filter: Substring to filter type name or label (case-insensitive).
+        limit: Max entries to return (default 200, max recommended 200).
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute("nodes.list_node_types", {"context": context})
+    params: dict = {"context": context, "limit": limit}
+    if filter is not None:
+        params["filter"] = filter
+    return await bridge.execute("nodes.list_node_types", params)
 
 
 @mcp.tool()

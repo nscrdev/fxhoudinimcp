@@ -397,12 +397,20 @@ def find_nodes(
 
 ###### nodes.list_node_types
 
-def list_node_types(context: str) -> dict:
-    """List all available node types in a given context category.
+def list_node_types(
+    context: str,
+    filter: str = None,
+    limit: int = 200,
+    **_,
+) -> dict:
+    """List available node types in a given context category.
 
     Args:
         context: Category name, e.g. "Sop", "Lop", "Dop", "Top",
                  "Cop2", "Object", "Driver".
+        filter: Optional substring to filter by type name or label
+                (case-insensitive). Use this to avoid dumping all types.
+        limit: Maximum number of types to return (default 200).
     """
     categories = hou.nodeTypeCategories()
     category = categories.get(context)
@@ -427,9 +435,20 @@ def list_node_types(context: str) -> dict:
             "label": node_type.description(),
         })
 
+    if filter:
+        f = filter.lower()
+        type_list = [
+            t for t in type_list
+            if f in t["name"].lower() or f in t["label"].lower()
+        ]
+
+    total = len(type_list)
+    type_list = type_list[:limit]
     return {
         "context": context,
-        "count": len(type_list),
+        "total_count": total,
+        "returned_count": len(type_list),
+        "truncated": total > limit,
         "types": type_list,
     }
 

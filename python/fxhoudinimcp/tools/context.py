@@ -24,9 +24,12 @@ async def get_network_overview(
 ) -> dict:
     """Get a compact overview of a network.
 
+    Keep `depth` low (1–2). Larger values on complex scenes return thousands
+    of nodes and can overflow the context window.
+
     Args:
         path: Network path.
-        depth: Recursion depth.
+        depth: Recursion depth (default 2, keep ≤ 3).
     """
     bridge = _get_bridge(ctx)
     return await bridge.execute(

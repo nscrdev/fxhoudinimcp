@@ -228,11 +228,17 @@ register_handler("parameters.set_parameters", _set_parameters)
 
 
 def _get_parameter_schema(
-    node_path: str, parm_name: str | None = None, **_: Any
+    node_path: str,
+    parm_name: str | None = None,
+    filter: str | None = None,
+    **_: Any,
 ) -> dict[str, Any]:
     """Get full parameter template info.
 
-    If *parm_name* is `None`, return info for every parameter on the node.
+    If *parm_name* is given, return info for that one parameter.
+    If *filter* is given, return only parameters whose name or label
+    contains the filter string (case-insensitive).
+    Otherwise return all non-hidden parameters.
     """
     node = _resolve_node(node_path)
 
@@ -250,7 +256,6 @@ def _get_parameter_schema(
         }
 
     # All parameters — hidden params skipped to keep the response compact.
-    # Pass parm_name to get the full schema for a specific parameter.
     ptg = node.parmTemplateGroup()
     parm_infos: list[dict[str, Any]] = []
 
@@ -262,6 +267,13 @@ def _get_parameter_schema(
                 parm_infos.append(_template_to_dict(entry))
 
     _walk(ptg.parmTemplates())
+
+    if filter:
+        f = filter.lower()
+        parm_infos = [
+            p for p in parm_infos
+            if f in p["name"].lower() or f in p["label"].lower()
+        ]
 
     return {
         "node_path": node_path,

@@ -165,6 +165,10 @@ async def capture_screenshot(
 ) -> list[TextContent | ImageContent]:
     """Capture a screenshot of the viewport or a specific pane tab.
 
+    Screenshots consume significant context tokens. Only take one when visual
+    confirmation is genuinely needed — prefer get_geometry_info, get_node_info,
+    or get_scene_summary for most inspection tasks.
+
     Args:
         output_path: Image file path.
         pane_name: Pane tab name.
@@ -184,6 +188,10 @@ async def capture_network_editor(
     node_path: str | None = None,
 ) -> list[TextContent | ImageContent]:
     """Capture a screenshot of the network editor.
+
+    Screenshots consume significant context tokens. Only take one when visual
+    confirmation of wiring is genuinely needed — prefer get_node_info or
+    list_children for inspecting node connections.
 
     Args:
         output_path: Image file path.

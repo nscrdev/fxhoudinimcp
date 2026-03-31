@@ -80,18 +80,28 @@ async def set_parameters(
 
 @mcp.tool()
 async def get_parameter_schema(
-    ctx: Context, node_path: str, parm_name: str | None = None
+    ctx: Context,
+    node_path: str,
+    parm_name: str | None = None,
+    filter: str | None = None,
 ) -> dict:
     """Get the template schema for parameter(s) on a node.
 
+    Most nodes have dozens of parameters; many have 100+. Always use
+    `parm_name` or `filter` unless you genuinely need the full list.
+
     Args:
         node_path: Node path.
-        parm_name: Parameter name. If None, returns all parameters.
+        parm_name: Exact parameter name for a single-parameter lookup.
+        filter: Substring to match against parameter name or label
+                (case-insensitive). Use instead of dumping all params.
     """
     bridge = _get_bridge(ctx)
     payload: dict[str, Any] = {"node_path": node_path}
     if parm_name is not None:
         payload["parm_name"] = parm_name
+    if filter is not None:
+        payload["filter"] = filter
     return await bridge.execute("parameters.get_parameter_schema", payload)
 
 

@@ -32,9 +32,10 @@ async def execute_python(
     - Connect nodes → use connect_nodes or connect_nodes_batch
     - Read geometry → use get_geometry_info, get_points, sample_geometry
 
-    ONLY use this when no dedicated tool exists for the operation, e.g.
-    reading a custom hou.* API, batch-renaming many nodes, or inspecting
-    live Python state that no other tool exposes.
+    ONLY use this when no dedicated tool exists for the operation — i.e.
+    hou.* API calls or Python-level state that no other tool exposes.
+    If a dedicated tool exists for the operation, always use it instead,
+    even if execute_python could also accomplish it.
 
     Args:
         code: Python source code to execute.
