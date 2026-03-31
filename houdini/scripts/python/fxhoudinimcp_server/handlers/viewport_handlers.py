@@ -21,16 +21,22 @@ from fxhoudinimcp_server.dispatcher import register_handler
 logger = logging.getLogger(__name__)
 
 # Maximum image dimension (width or height) before automatic downscaling.
-# This keeps base64 payloads small enough to avoid blowing up LLM token counts.
-_MAX_IMAGE_DIM = 1024
-_JPEG_QUALITY = 80
+# Keep this low — a 1024px JPEG base64-encodes to ~100-300 KB of ASCII text,
+# which costs tens of thousands of LLM tokens per screenshot.
+_MAX_IMAGE_DIM = 512
+_JPEG_QUALITY = 60
+# Hard cap on the base64 payload in bytes. If the compressed JPEG still
+# exceeds this, re-encode at lower quality until it fits.
+_MAX_BASE64_BYTES = 80_000  # ~80 KB → ~20 K tokens
 
 
 def _downscale_and_encode(file_path: str) -> tuple[str | None, str]:
     """Read an image file, downscale if too large, JPEG-compress, and return
     (base64_data, mime_type).
 
-    Returns (None, mime_type) if the file cannot be read.
+    Returns (None, mime_type) if the file cannot be read or cannot be
+    compressed (avoids returning a raw multi-MB PNG that would blow the
+    LLM context).
     """
     mime_type = "image/jpeg"
 
@@ -42,15 +48,31 @@ def _downscale_and_encode(file_path: str) -> tuple[str | None, str]:
             from PySide6.QtGui import QImage
             from PySide6.QtCore import Qt, QBuffer, QIODevice
         except ImportError:
-            # Fallback: raw read with no compression
-            mime_type = "image/png"
-            if file_path.lower().endswith((".jpg", ".jpeg")):
-                mime_type = "image/jpeg"
+            # Qt not available — try Pillow before giving up.
             try:
-                with open(file_path, "rb") as f:
-                    return base64.b64encode(f.read()).decode("ascii"), mime_type
+                from PIL import Image as PilImage
+                import io as _io
+                with PilImage.open(file_path) as img:
+                    img = img.convert("RGB")
+                    w, h = img.size
+                    if w > _MAX_IMAGE_DIM or h > _MAX_IMAGE_DIM:
+                        img.thumbnail((_MAX_IMAGE_DIM, _MAX_IMAGE_DIM), PilImage.LANCZOS)
+                    quality = _JPEG_QUALITY
+                    for _ in range(4):
+                        buf = _io.BytesIO()
+                        img.save(buf, format="JPEG", quality=quality)
+                        data = buf.getvalue()
+                        if len(base64.b64encode(data)) <= _MAX_BASE64_BYTES:
+                            break
+                        quality = max(quality - 15, 20)
+                    return base64.b64encode(data).decode("ascii"), mime_type
             except Exception:
-                return None, mime_type
+                pass
+            # Cannot compress — skip the image rather than returning raw PNG.
+            logger.warning(
+                "Neither Qt nor Pillow available; skipping image for %s", file_path
+            )
+            return None, mime_type
 
     try:
         img = QImage(file_path)
@@ -65,12 +87,19 @@ def _downscale_and_encode(file_path: str) -> tuple[str | None, str]:
                 Qt.KeepAspectRatio, Qt.SmoothTransformation,
             )
 
-        # Encode to JPEG in-memory
-        buf = QBuffer()
-        buf.open(QIODevice.WriteOnly)
-        img.save(buf, "JPEG", _JPEG_QUALITY)
-        buf.close()
-        return base64.b64encode(buf.data().data()).decode("ascii"), mime_type
+        # Encode to JPEG in-memory; if still too large, reduce quality.
+        quality = _JPEG_QUALITY
+        for _ in range(4):
+            buf = QBuffer()
+            buf.open(QIODevice.WriteOnly)
+            img.save(buf, "JPEG", quality)
+            buf.close()
+            data = buf.data().data()
+            if len(base64.b64encode(data)) <= _MAX_BASE64_BYTES:
+                break
+            quality = max(quality - 15, 20)
+
+        return base64.b64encode(data).decode("ascii"), mime_type
     except Exception as exc:
         logger.warning("Image downscale/encode failed: %s", exc)
         return None, mime_type
@@ -719,6 +748,27 @@ def _find_pane_by_name(pane_name: str):
     )
 
 
+###### viewport.log_status
+
+def log_status(message: str, severity: str = "message") -> dict:
+    """Display a status message in Houdini's status bar.
+
+    Args:
+        message: The status message to display.
+        severity: Severity level — "message" (default), "important",
+            "warning", or "error".
+    """
+    severity_map = {
+        "message": hou.severityType.Message,
+        "important": hou.severityType.ImportantMessage,
+        "warning": hou.severityType.Warning,
+        "error": hou.severityType.Error,
+    }
+    sev = severity_map.get(severity.lower(), hou.severityType.Message)
+    hou.ui.setStatusMessage(message, severity=sev)
+    return {"message": message, "severity": severity}
+
+
 ###### Registration
 
 register_handler("viewport.list_panes", list_panes)
@@ -733,3 +783,4 @@ register_handler("viewport.capture_screenshot", capture_screenshot)
 register_handler("viewport.capture_network_editor", capture_network_editor)
 register_handler("viewport.set_current_network", set_current_network)
 register_handler("viewport.find_error_nodes", find_error_nodes)
+register_handler("viewport.log_status", log_status)

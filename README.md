@@ -9,7 +9,7 @@
   <p align="center">
     The most comprehensive MCP server for SideFX Houdini.
     <br/>
-    167 tools across 19 categories, covering every major Houdini context.
+    168 tools across 19 categories, covering every major Houdini context.
     <br/><br/>
   </p>
 
@@ -53,7 +53,7 @@
 
 A comprehensive [MCP](https://modelcontextprotocol.io/) (Model Context Protocol) server for [SideFX Houdini](https://www.sidefx.com/). Connects AI assistants like Claude directly to Houdini's Python API, enabling natural language control over scene building, simulation setup, rendering, and more.
 
-**167 tools**, **8 resources**, and **6 workflow prompts** out of the box.
+**168 tools**, **8 resources**, and **6 workflow prompts** out of the box.
 
 <!-- FEATURES -->
 ## Features
@@ -73,7 +73,7 @@ A comprehensive [MCP](https://modelcontextprotocol.io/) (Model Context Protocol)
 | **Rendering** | 9 | Viewport capture, render nodes, settings, render launch |
 | **VEX** | 5 | Create/edit wrangles, validate VEX code |
 | **Code Execution** | 4 | Python, HScript, expressions, env variables |
-| **Viewport/UI** | 10 | Pane management, screenshots, error detection |
+| **Viewport/UI** | 11 | Pane management, screenshots, status messages, error detection |
 | **Scene Context** | 8 | Network overview, cook chain, selection, scene summary, error analysis |
 | **Workflows** | 8 | One-call Pyro/RBD/FLIP/Vellum setup, SOP chains, render config |
 | **Materials** | 4 | List, inspect, create materials and shader networks |
@@ -95,7 +95,7 @@ flowchart LR
 
     subgraph MCP[" ⚡ FXHoudini MCP Server "]
         direction TB
-        B1("🔧 167 Tools")
+        B1("🔧 168 Tools")
         B2("📦 8 Resources")
         B3("💬 6 Prompts")
     end
@@ -174,7 +174,7 @@ pip install -e ".[dev]"
 
 Copy the contents of `houdini/` into your Houdini user preferences directory so that:
 - `scripts/python/fxhoudinimcp_server/` is on Houdini's Python path
-- `scripts/456.py` runs on scene load
+- `python3.Xlibs/uiready.py` auto-starts the server (copy the folder matching your Houdini's Python version)
 - `toolbar/fxhoudinimcp.shelf` appears in your shelf
 
 ### 3. Configure Your MCP Client
@@ -229,7 +229,7 @@ Copy the contents of `houdini/` into your Houdini user preferences directory so 
 <!-- USAGE -->
 ## Usage
 
-Launch Houdini normally. The plugin auto-starts on scene load (controlled by `FXHOUDINIMCP_AUTOSTART` env var). You can also toggle it manually via the **MCP Server** shelf tool.
+Launch Houdini normally. The plugin auto-starts once when the UI is ready (controlled by `FXHOUDINIMCP_AUTOSTART` env var). The startup script uses `uiready.py`, which stacks correctly with other Houdini packages. You can also toggle it manually via the **MCP Server** shelf tool.
 
 Once connected, your AI assistant can:
 

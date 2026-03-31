@@ -137,8 +137,8 @@ def _execute_hscript(command: str, **_: Any) -> dict[str, Any]:
     output, errors = hou.hscript(command)
 
     return {
-        "output": output,
-        "errors": errors if errors else None,
+        "output": _truncate_output(output) if output else output,
+        "errors": _truncate_output(errors) if errors else None,
     }
 
 

@@ -26,7 +26,13 @@ async def create_wrangle(
 ) -> dict:
     """Create an Attribute Wrangle node with VEX code.
 
-    Preferred over execute_python for all geometry manipulation.
+    LAST RESORT — only use when no built-in SOP node can do the job.
+    For geometry manipulation always prefer native SOP nodes first:
+    box/grid/sphere for shapes, polyextrude for extrusion, boolean for CSG,
+    scatter for point distribution, attribute_randomize for random attributes,
+    blast for deletion, copy_to_points for instancing.
+    Only reach for a wrangle when the logic (e.g. a custom math curve, complex
+    per-point attribute computation) cannot be expressed with any built-in SOP.
 
     Args:
         parent_path: Parent SOP network path.

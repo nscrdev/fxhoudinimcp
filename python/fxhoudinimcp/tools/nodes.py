@@ -121,7 +121,10 @@ async def move_node(ctx: Context, node_path: str, dest_parent: str) -> dict:
 
 @mcp.tool()
 async def get_node_info(ctx: Context, node_path: str) -> dict:
-    """Get detailed information about a node.
+    """Get type, connections, flags, errors, cook time, and non-default parameters for a node.
+
+    Returns only parameters that differ from their defaults (non_default_parameters)
+    plus a total_param_count. Use get_parameter_schema to inspect the full parameter list.
 
     Args:
         ctx: MCP context.

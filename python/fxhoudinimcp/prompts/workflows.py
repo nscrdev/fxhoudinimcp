@@ -11,6 +11,11 @@ from fxhoudinimcp.server import mcp
 # Shared guidelines appended to every workflow prompt.
 _NETWORK_HOUSEKEEPING = """
 Network housekeeping (ALWAYS follow these):
+- Call log_status at the start of every major step (creating geometry,
+  wiring the chain, setting up materials, etc.) so the user can see what
+  you are doing in Houdini's status bar without inspecting tool call logs.
+  Keep messages short: "Creating source geometry...", "Wiring SOP chain...",
+  "Done — display flag set on output node."
 - Call set_current_network on the parent network you are building in so the
   user can see your work in the network editor. Do this BEFORE you start
   creating nodes, and again whenever you move to a different network level.
@@ -239,9 +244,11 @@ Tips:
 - Check get_sim_memory_usage for large simulations
 - Use list_node_types with context="Dop" to discover available node types
 - Build source geometry with SOP node chains (Box, Grid, Sphere, Scatter,
-  Boolean, PolyExtrude, Copy to Points, etc.) — NOT VEX wrangles.
-  Wrangles are a last resort for logic no built-in SOP can express.
-  Plan your node chain before building. Call list_node_types to discover SOPs.
+  Boolean, PolyExtrude, Copy to Points, Attribute Randomize, Blast, etc.)
+  — NOT VEX wrangles. Plan your node chain first: every operation should be
+  a visible SOP node. Wrangles are an absolute last resort for logic that
+  no built-in SOP can express. Before writing VEX, call list_node_types
+  with context="Sop" to confirm no SOP already does the job.
 {_NETWORK_HOUSEKEEPING}"""
 
 

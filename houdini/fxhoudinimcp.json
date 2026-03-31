@@ -2,7 +2,7 @@
     "env": [
         {
             "FXHOUDINIMCP": {
-                "value": "$HOUDINI_USER_PREF_DIR/fxhoudinimcp",
+                "value": "$HOUDINI_USER_PREF_DIR/fxhoudinimcp/houdini",
                 "method": "default"
             }
         }

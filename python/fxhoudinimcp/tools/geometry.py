@@ -96,13 +96,21 @@ async def get_attrib_values(
     node_path: str,
     attrib_name: str,
     attrib_class: str = "point",
+    start: int = 0,
+    count: int = 10000,
 ) -> dict:
-    """Read all values of a single attribute.
+    """Read attribute values as a flat array with pagination.
+
+    Values are element-major: for a float3 attribute every 3 consecutive
+    values belong to one element. Check has_more and increment start to
+    read subsequent pages.
 
     Args:
         node_path: Node path.
         attrib_name: Attribute name.
         attrib_class: "point", "prim", "vertex", or "detail".
+        start: First element index to return.
+        count: Max elements per page (default 10 000).
     """
     bridge = _get_bridge(ctx)
     return await bridge.execute(
@@ -111,6 +119,8 @@ async def get_attrib_values(
             "node_path": node_path,
             "attrib_name": attrib_name,
             "attrib_class": attrib_class,
+            "start": start,
+            "count": count,
         },
     )
 
@@ -162,13 +172,19 @@ async def get_group_members(
     node_path: str,
     group_name: str,
     group_type: str = "point",
+    start: int = 0,
+    count: int = 5000,
 ) -> dict:
-    """Get element indices in a geometry group.
+    """Get element indices in a geometry group, with pagination.
+
+    Check has_more and increment start to read subsequent pages.
 
     Args:
         node_path: Node path.
         group_name: Group name.
         group_type: "point", "prim", or "edge".
+        start: First element index to return.
+        count: Max elements per page (default 5 000).
     """
     bridge = _get_bridge(ctx)
     return await bridge.execute(
@@ -177,6 +193,8 @@ async def get_group_members(
             "node_path": node_path,
             "group_name": group_name,
             "group_type": group_type,
+            "start": start,
+            "count": count,
         },
     )
 

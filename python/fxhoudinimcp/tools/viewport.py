@@ -229,3 +229,27 @@ async def find_error_nodes(
         "viewport.find_error_nodes",
         {"root_path": root_path},
     )
+
+
+@mcp.tool()
+async def log_status(
+    ctx: Context,
+    message: str,
+    severity: str = "message",
+) -> dict:
+    """Display a status message in Houdini's status bar.
+
+    Call this at the START of every major step so the user can follow
+    along in real time without having to inspect tool call logs.
+    Examples: "Creating base geometry...", "Wiring SOP chain...",
+    "Setting up pyro simulation...", "Assigning materials...".
+
+    Args:
+        message: Status message to display (keep it short and human-readable).
+        severity: "message" (default), "important", "warning", or "error".
+    """
+    bridge = _get_bridge(ctx)
+    return await bridge.execute(
+        "viewport.log_status",
+        {"message": message, "severity": severity},
+    )

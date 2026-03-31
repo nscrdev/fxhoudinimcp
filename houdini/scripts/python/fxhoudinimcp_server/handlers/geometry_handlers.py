@@ -89,15 +89,30 @@ def _get_geometry_info(*, node_path: str) -> dict[str, Any]:
     ]:
         attribs[label] = [_attrib_meta(a) for a in getter()]
 
-    # Prim type breakdown
+    # Prim type breakdown — capped at 10 000 prims to avoid slow Python loops
+    # on large meshes. Sampled proportionally when over the limit.
+    all_prims = geo.prims()
+    _PRIM_SAMPLE_LIMIT = 10_000
     prim_types: dict[str, int] = {}
-    for prim in geo.prims():
-        t = prim.type().name()
-        prim_types[t] = prim_types.get(t, 0) + 1
+    prim_sample_note: str | None = None
+    if len(all_prims) <= _PRIM_SAMPLE_LIMIT:
+        for prim in all_prims:
+            t = prim.type().name()
+            prim_types[t] = prim_types.get(t, 0) + 1
+    else:
+        step = len(all_prims) / _PRIM_SAMPLE_LIMIT
+        for i in range(_PRIM_SAMPLE_LIMIT):
+            prim = all_prims[int(i * step)]
+            t = prim.type().name()
+            prim_types[t] = prim_types.get(t, 0) + 1
+        # Scale counts back up to approximate totals
+        scale = len(all_prims) / _PRIM_SAMPLE_LIMIT
+        prim_types = {k: int(v * scale) for k, v in prim_types.items()}
+        prim_sample_note = f"sampled {_PRIM_SAMPLE_LIMIT}/{len(all_prims)} prims"
 
     bbox = geo.boundingBox()
 
-    return {
+    result: dict[str, Any] = {
         "node_path": node_path,
         "num_points": geo.intrinsicValue("pointcount"),
         "num_prims": geo.intrinsicValue("primitivecount"),
@@ -111,6 +126,9 @@ def _get_geometry_info(*, node_path: str) -> dict[str, Any]:
         },
         "prim_type_breakdown": prim_types,
     }
+    if prim_sample_note:
+        result["prim_type_breakdown_note"] = prim_sample_note
+    return result
 
 register_handler("geometry.get_geometry_info", _get_geometry_info)
 
@@ -231,8 +249,15 @@ def _get_attrib_values(
     node_path: str,
     attrib_name: str,
     attrib_class: str = "point",
+    start: int = 0,
+    count: int = 10000,
 ) -> dict[str, Any]:
-    """Read all values of one attribute efficiently as a flat array."""
+    """Read attribute values as a flat array with pagination.
+
+    Values are element-major (e.g. for a float3 attribute with tuple_size=3,
+    every 3 consecutive values belong to one element).  Use start/count to
+    page through large attributes without blowing the LLM context.
+    """
     geo = _get_sop_geo(node_path)
 
     cls = attrib_class.lower()
@@ -241,7 +266,7 @@ def _get_attrib_values(
         if attrib is None:
             raise hou.OperationFailed(
                 f"Point attribute '{attrib_name}' not found on {node_path}")
-        values = geo.pointFloatAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Float \
+        all_values = geo.pointFloatAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Float \
             else geo.pointIntAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Int \
             else geo.pointStringAttribValues(attrib_name)
     elif cls == "prim":
@@ -249,7 +274,7 @@ def _get_attrib_values(
         if attrib is None:
             raise hou.OperationFailed(
                 f"Prim attribute '{attrib_name}' not found on {node_path}")
-        values = geo.primFloatAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Float \
+        all_values = geo.primFloatAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Float \
             else geo.primIntAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Int \
             else geo.primStringAttribValues(attrib_name)
     elif cls == "vertex":
@@ -257,7 +282,7 @@ def _get_attrib_values(
         if attrib is None:
             raise hou.OperationFailed(
                 f"Vertex attribute '{attrib_name}' not found on {node_path}")
-        values = geo.vertexFloatAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Float \
+        all_values = geo.vertexFloatAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Float \
             else geo.vertexIntAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Int \
             else geo.vertexStringAttribValues(attrib_name)
     elif cls in ("detail", "global"):
@@ -266,26 +291,35 @@ def _get_attrib_values(
             raise hou.OperationFailed(
                 f"Detail attribute '{attrib_name}' not found on {node_path}")
         val = geo.attribValue(attrib_name)
-        values = _vec_to_list(val)
         return {
             "node_path": node_path,
             "attrib_name": attrib_name,
             "attrib_class": attrib_class,
             "size": attrib.size(),
             "type": attrib.dataType().name(),
-            "value": values,
+            "value": _vec_to_list(val),
         }
     else:
         raise ValueError(f"Invalid attrib_class: {attrib_class!r}")
+
+    tuple_size = max(attrib.size(), 1)
+    total_elements = len(all_values) // tuple_size
+    # Clamp page to element boundaries
+    start_elem = max(0, min(start, total_elements))
+    end_elem = min(start_elem + max(1, count), total_elements)
+    page = list(all_values[start_elem * tuple_size : end_elem * tuple_size])
 
     return {
         "node_path": node_path,
         "attrib_name": attrib_name,
         "attrib_class": attrib_class,
-        "size": attrib.size(),
+        "tuple_size": tuple_size,
         "type": attrib.dataType().name(),
-        "count": len(values) // max(attrib.size(), 1),
-        "values": list(values),
+        "total_elements": total_elements,
+        "start": start_elem,
+        "count": end_elem - start_elem,
+        "has_more": end_elem < total_elements,
+        "values": page,
     }
 
 register_handler("geometry.get_attrib_values", _get_attrib_values)
@@ -387,8 +421,10 @@ def _get_group_members(
     node_path: str,
     group_name: str,
     group_type: str = "point",
+    start: int = 0,
+    count: int = 5000,
 ) -> dict[str, Any]:
-    """Get element indices belonging to a group."""
+    """Get element indices belonging to a group, with pagination."""
     geo = _get_sop_geo(node_path)
 
     gt = group_type.lower()
@@ -397,30 +433,37 @@ def _get_group_members(
         if grp is None:
             raise hou.OperationFailed(
                 f"Point group '{group_name}' not found on {node_path}")
-        indices = [pt.number() for pt in grp.points()]
+        all_indices = [pt.number() for pt in grp.points()]
     elif gt == "prim":
         grp = geo.findPrimGroup(group_name)
         if grp is None:
             raise hou.OperationFailed(
                 f"Prim group '{group_name}' not found on {node_path}")
-        indices = [pr.number() for pr in grp.prims()]
+        all_indices = [pr.number() for pr in grp.prims()]
     elif gt == "edge":
         grp = geo.findEdgeGroup(group_name)
         if grp is None:
             raise hou.OperationFailed(
                 f"Edge group '{group_name}' not found on {node_path}")
-        indices = [[e.points()[0].number(), e.points()[1].number()]
-                   for e in grp.edges()]
+        all_indices = [[e.points()[0].number(), e.points()[1].number()]
+                       for e in grp.edges()]
     else:
         raise ValueError(f"Invalid group_type: {group_type!r}. "
                          f"Use 'point', 'prim', or 'edge'.")
+
+    total = len(all_indices)
+    end = min(start + max(1, count), total)
+    page = all_indices[start:end]
 
     return {
         "node_path": node_path,
         "group_name": group_name,
         "group_type": group_type,
-        "count": len(indices),
-        "members": indices,
+        "total_count": total,
+        "start": start,
+        "count": len(page),
+        "has_more": end < total,
+        "members": page,
     }
 
 register_handler("geometry.get_group_members", _get_group_members)

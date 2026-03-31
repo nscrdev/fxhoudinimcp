@@ -196,19 +196,24 @@ def get_node_info(node_path: str) -> dict:
     """
     node = _get_node(node_path)
 
-    # Parameter summary (name, value, default)
+    # Only return parameters that differ from their defaults — this keeps
+    # the response compact (a complex node can have 500+ parms, most at default).
+    # Use get_parameter_schema to inspect the full parameter list.
+    all_parms = node.parms()
     parms_summary = []
-    for parm in node.parms():
+    for parm in all_parms:
         try:
             val = parm.eval()
         except Exception:
-            val = None
+            continue
         try:
             default = parm.parmTemplate().defaultValue()
             if isinstance(default, tuple) and len(default) == 1:
                 default = default[0]
         except Exception:
             default = None
+        if val == default:
+            continue
         parms_summary.append({
             "name": parm.name(),
             "label": parm.description(),
@@ -276,20 +281,20 @@ def get_node_info(node_path: str) -> dict:
     except Exception:
         cook_time = None
 
-    # Type info
+    # Type info — icon omitted (string path, useless to LLM)
     node_type = node.type()
     type_info = {
         "name": node_type.name(),
         "label": node_type.description(),
         "category": node_type.category().name(),
-        "icon": node_type.icon(),
     }
 
     return {
         "node_path": node.path(),
         "name": node.name(),
         "type": type_info,
-        "parameters": parms_summary,
+        "total_param_count": len(all_parms),
+        "non_default_parameters": parms_summary,
         "input_connectors": node.type().maxNumInputs(),
         "inputs": inputs,
         "outputs": outputs,
@@ -324,15 +329,19 @@ def list_children(
     else:
         children = parent.children()
 
+    _MAX_CHILDREN = 500
     results = []
     for child in children:
         if filter_type and child.type().name() != filter_type:
             continue
         results.append(_node_summary(child))
+        if len(results) >= _MAX_CHILDREN:
+            break
 
     return {
         "parent_path": parent_path,
         "count": len(results),
+        "truncated": len(results) >= _MAX_CHILDREN,
         "children": results,
     }
 
@@ -356,6 +365,7 @@ def find_nodes(
     root = _get_node(inside)
     all_nodes = root.allSubChildren()
 
+    _MAX_RESULTS = 500
     results = []
     for node in all_nodes:
         # Filter by name pattern
@@ -375,9 +385,12 @@ def find_nodes(
                 continue
 
         results.append(_node_summary(node))
+        if len(results) >= _MAX_RESULTS:
+            break
 
     return {
         "count": len(results),
+        "truncated": len(results) >= _MAX_RESULTS,
         "nodes": results,
     }
 
@@ -412,7 +425,6 @@ def list_node_types(context: str) -> dict:
         type_list.append({
             "name": type_name,
             "label": node_type.description(),
-            "icon": node_type.icon(),
         })
 
     return {

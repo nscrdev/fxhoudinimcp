@@ -1,10 +1,12 @@
-"""Auto-start FXHoudini-MCP server on scene load.
+"""Auto-start FXHoudini-MCP server when Houdini's UI is ready.
 
-This script runs every time a scene is loaded in Houdini.
+This script is sourced by Houdini once at startup, after the UI is
+initialised.  Unlike scripts/456.py it stacks correctly with other
+packages that also define a uiready.py.
+
 Set FXHOUDINIMCP_AUTOSTART=0 to disable auto-start.
 """
 
-# Built-in
 import os
 
 if os.environ.get("FXHOUDINIMCP_AUTOSTART", "1") == "1":

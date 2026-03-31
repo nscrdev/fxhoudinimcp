@@ -592,6 +592,8 @@ def _compare_snapshots(
     """
     global _snapshots
 
+    _SNAPSHOT_NODE_LIMIT = 1000
+
     def _capture_state() -> dict[str, dict]:
         """Capture current scene state as a lightweight snapshot."""
         state: dict[str, dict] = {}
@@ -604,6 +606,8 @@ def _compare_snapshots(
                 "type": node.type().name(),
                 "params": parms,
             }
+            if len(state) >= _SNAPSHOT_NODE_LIMIT:
+                break
         return state
 
     if action == "take":
@@ -652,15 +656,21 @@ def _compare_snapshots(
                         "changes": changes,
                     })
 
+        _LIST_CAP = 200
         return {
             "action": "compare",
             "snapshot_name": snapshot_name,
-            "nodes_added": nodes_added,
-            "nodes_removed": nodes_removed,
-            "params_changed": params_changed,
+            "nodes_added": nodes_added[:_LIST_CAP],
             "nodes_added_count": len(nodes_added),
+            "nodes_removed": nodes_removed[:_LIST_CAP],
             "nodes_removed_count": len(nodes_removed),
+            "params_changed": params_changed[:_LIST_CAP],
             "params_changed_count": len(params_changed),
+            "truncated": (
+                len(nodes_added) > _LIST_CAP
+                or len(nodes_removed) > _LIST_CAP
+                or len(params_changed) > _LIST_CAP
+            ),
         }
 
     else:

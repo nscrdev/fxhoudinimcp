@@ -194,9 +194,21 @@ async def build_sop_chain(
     parent_path: str = "/obj/geo1",
     steps: Optional[list] = None,
 ) -> dict:
-    """Build a sequential chain of SOP nodes wired together.
+    """Build a sequential chain of SOP nodes wired together in a single call.
 
-    Each step dict: {"type": str, "name": str, "params": dict}.
+    PREFERRED over individual create_node calls for linear SOP chains — builds
+    and wires the entire chain in one round-trip, which is significantly faster.
+
+    Each step dict: {"type": str, "name": str (optional), "params": dict (optional)}.
+    Nodes are created in order and each is automatically connected to the previous.
+
+    Example:
+        steps=[
+            {"type": "box"},
+            {"type": "polybevel", "params": {"offset": 0.05}},
+            {"type": "scatter", "params": {"npts": 200}},
+            {"type": "copy_to_points", "name": "copy1"},
+        ]
 
     Args:
         parent_path: Parent SOP network path.

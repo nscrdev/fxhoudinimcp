@@ -100,13 +100,15 @@ def _template_to_dict(pt: hou.ParmTemplate) -> dict[str, Any]:
     except Exception:
         pass
 
-    # Menu items
+    # Menu items — capped at 50 to avoid enormous enum lists
     try:
         items = pt.menuItems()
         labels = pt.menuLabels()
         if items:
-            info["menu_items"] = list(items)
-            info["menu_labels"] = list(labels)
+            info["menu_items"] = list(items)[:50]
+            info["menu_labels"] = list(labels)[:50]
+            if len(items) > 50:
+                info["menu_items_truncated"] = True
     except Exception:
         pass
 
@@ -116,25 +118,8 @@ def _template_to_dict(pt: hou.ParmTemplate) -> dict[str, Any]:
     except Exception:
         pass
 
-    # Conditionals
-    try:
-        conditionals = {}
-        for cond_type in hou.parmCondType.values.values():
-            expr = pt.conditionalString(cond_type)
-            if expr:
-                conditionals[cond_type.name()] = expr
-        if conditionals:
-            info["conditionals"] = conditionals
-    except Exception:
-        pass
-
-    # Tags
-    try:
-        tags = pt.tags()
-        if tags:
-            info["tags"] = dict(tags)
-    except Exception:
-        pass
+    # Conditionals and tags omitted — internal Houdini UI metadata,
+    # not useful for LLM-driven parameter setting.
 
     return info
 
@@ -264,7 +249,8 @@ def _get_parameter_schema(
             "parameter": _template_to_dict(parm.parmTemplate()),
         }
 
-    # All parameters
+    # All parameters — hidden params skipped to keep the response compact.
+    # Pass parm_name to get the full schema for a specific parameter.
     ptg = node.parmTemplateGroup()
     parm_infos: list[dict[str, Any]] = []
 
@@ -272,13 +258,14 @@ def _get_parameter_schema(
         for entry in entries:
             if isinstance(entry, hou.FolderParmTemplate):
                 _walk(entry.parmTemplates())
-            else:
+            elif not entry.isHidden():
                 parm_infos.append(_template_to_dict(entry))
 
     _walk(ptg.parmTemplates())
 
     return {
         "node_path": node_path,
+        "parameter_count": len(parm_infos),
         "parameters": parm_infos,
     }
 
