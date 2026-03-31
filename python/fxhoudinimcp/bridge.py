@@ -78,8 +78,6 @@ class HoudiniBridge:
         logger.info("→ Houdini: %s", command)
 
         client = await self._get_client()
-        if timeout:
-            client = httpx.AsyncClient(timeout=timeout)
 
         try:
             response = await client.post(
@@ -90,6 +88,7 @@ class HoudiniBridge:
                     params=params or {},
                     request_id=request_id,
                 ),
+                timeout=timeout or self.timeout,
             )
             response.raise_for_status()
         except httpx.ConnectError as e:
@@ -111,9 +110,6 @@ class HoudiniBridge:
                 f"Request to Houdini timed out after {timeout or self.timeout}s",
                 details={"timeout": timeout or self.timeout},
             ) from e
-        finally:
-            if timeout:
-                await client.aclose()
 
         result = response.json()
         timing = result.get("timing_ms", "") if isinstance(result, dict) else ""

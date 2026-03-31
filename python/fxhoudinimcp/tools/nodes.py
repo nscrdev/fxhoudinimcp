@@ -26,6 +26,12 @@ async def create_node(
 ) -> dict:
     """Create a node inside a parent network.
 
+    Before using this, call list_node_types(context='<context>', filter='<keyword>')
+    to verify a dedicated node exists for the operation. Houdini has thousands of
+    nodes — many common operations (boolean, scatter, copy to points, fracture,
+    ocean, hair, vellum, pyro, etc.) have dedicated nodes that are better than
+    writing VEX or Python.
+
     Args:
         ctx: MCP context.
         parent_path: Parent network path.

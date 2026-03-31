@@ -111,7 +111,7 @@ async def create_render_node(
     """Create a new render (ROP) node in /out.
 
     Args:
-        renderer: Renderer type ('karma', 'opengl', 'mantra', 'rop_geometry', 'rop_alembic', 'usdrender', 'fetch', 'merge').
+        renderer: Renderer type ('karma', 'opengl', 'mantra', 'rop_geometry', 'rop_alembic', 'usdrender', 'fetch', 'merge', 'rop_fbx', 'rop_gltf').
         name: Node name.
         camera: Camera node path.
         output_path: Output file path.

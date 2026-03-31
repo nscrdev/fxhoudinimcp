@@ -173,6 +173,12 @@ async def create_lop_node(
 ) -> dict:
     """Create a new LOP node.
 
+    Before using this, call list_node_types(context='Lop', filter='<keyword>')
+    to verify the correct node type. Solaris ships many specialized LOPs —
+    sublayer, reference, materiallibrary, assignmaterial, karmarendersettings,
+    editproperties, xform, prune, configurelayer, collection, addvariant —
+    that may not be obvious from their names.
+
     Args:
         parent_path: Parent node path.
         lop_type: LOP node type (e.g. "sphere", "sublayer", "merge").

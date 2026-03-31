@@ -26,13 +26,12 @@ async def create_wrangle(
 ) -> dict:
     """Create an Attribute Wrangle node with VEX code.
 
-    LAST RESORT — only use when no built-in SOP can do the job.
-    Before writing any VEX, call list_node_types(context='Sop', filter='<keyword>')
-    to check. There are hundreds of SOPs covering shapes, deformations, booleans,
-    scattering, instancing, deletion, randomization, and more. Only reach for a
-    wrangle when the logic genuinely cannot be expressed with any built-in SOP
-    (e.g. a custom math curve, or complex per-point attribute computation that no
-    SOP exposes).
+    LAST RESORT — calling this without first checking for a built-in node is
+    a mistake. You MUST call list_node_types(context='<context>', filter='<keyword>')
+    before using this tool and confirm no node covers the operation. Do not skip
+    this check even when you think you know what's available — Houdini ships
+    hundreds of nodes and HDAs that may not be in your training data. Only create
+    a wrangle when the logic genuinely cannot be expressed with any built-in node.
 
     Args:
         parent_path: Parent SOP network path.

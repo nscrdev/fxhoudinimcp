@@ -52,6 +52,12 @@ async def create_chop_node(
 ) -> dict:
     """Create a new CHOP node.
 
+    Before using this, call list_node_types(context='Chop', filter='<keyword>')
+    to verify the correct node type. CHOPs has many dedicated nodes for motion
+    and timing — noise, wave, spring, jiggle, lag, limit, filter, math,
+    function, blend, shift, stretch, trim, cycle, speed, constraintlookatat,
+    constraintpath — that may already do what you need.
+
     Args:
         parent_path: Parent network path.
         chop_type: CHOP node type to create.

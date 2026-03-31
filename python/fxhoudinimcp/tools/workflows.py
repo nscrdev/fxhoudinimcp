@@ -29,6 +29,10 @@ async def setup_pyro_sim(
 ) -> dict:
     """Build a Pyro smoke/fire simulation network from source geometry.
 
+    Preferred over manual DOP wiring — builds the entire pyro network in one call.
+    For custom setups beyond what this provides, use create_node with DOP nodes
+    (pyrosolver, smokeobject, volumesource, etc.).
+
     Args:
         source_geo: Source SOP path.
         container: Container type.
@@ -59,6 +63,10 @@ async def setup_rbd_sim(
 ) -> dict:
     """Build an RBD rigid-body simulation network with fracture and solver.
 
+    Preferred over manual DOP wiring — builds the entire RBD network in one call.
+    For source geometry, build SOP chains with native nodes (voronoifracture,
+    booleanfracture, rbdmaterialfracture) instead of VEX.
+
     Args:
         geo_path: Source geometry object path.
         ground: Add a ground plane.
@@ -87,6 +95,9 @@ async def setup_flip_sim(
 ) -> dict:
     """Build a FLIP fluid simulation network from source geometry.
 
+    Preferred over manual DOP wiring — builds the entire FLIP network in one call.
+    Use FLIP Source SOP or Volume Source DOP for custom sourcing.
+
     Args:
         source_geo: Source SOP path.
         domain: Domain type.
@@ -114,6 +125,9 @@ async def setup_vellum_sim(
     name: str = "vellum_sim",
 ) -> dict:
     """Build a Vellum simulation network with configure node and solver.
+
+    Preferred over manual DOP wiring — builds the entire Vellum network in one call.
+    Use Vellum Drape SOP to let cloth settle before the main simulation.
 
     Args:
         geo_path: Source geometry object path.

@@ -80,6 +80,15 @@ async def create_cop_node(
 ) -> dict:
     """Create a COP node in the specified network.
 
+    Before using this, call list_node_types(context='Cop', filter='<keyword>')
+    for Copernicus nodes (Houdini 20+), or context='Cop2' for legacy COPs.
+    Copernicus is the modern image processing system and is preferred over COP2
+    (deprecated as of Houdini 20.5). COPs has many dedicated image-processing
+    nodes — blur, sharpen, levels, contrast, over, multiply, luminance,
+    premultiply, channelcopy, noise, ramp, fractalnoise, worleynoise,
+    rasterizegeo, heighttonormal, sdfshape — that may cover the operation
+    without needing a VEX COP or Python.
+
     Args:
         parent_path: Path to the parent COP network.
         cop_type: COP node type to create.
