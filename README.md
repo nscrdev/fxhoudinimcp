@@ -196,18 +196,20 @@ Copy the contents of `houdini/` into your Houdini user preferences directory so 
 }
 ```
 
-**Claude Code** (`.mcp.json` in project root):
+**Claude Code** (global — available in every project):
+
+```shell
+claude mcp add --scope user fxhoudini -- python -m fxhoudinimcp
+```
+
+Or to scope it to a single project, add a `.mcp.json` in the project root:
 
 ```json
 {
   "mcpServers": {
     "fxhoudini": {
       "command": "python",
-      "args": ["-m", "fxhoudinimcp"],
-      "env": {
-        "HOUDINI_HOST": "localhost",
-        "HOUDINI_PORT": "8100"
-      }
+      "args": ["-m", "fxhoudinimcp"]
     }
   }
 }
