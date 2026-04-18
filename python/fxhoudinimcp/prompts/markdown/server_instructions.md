@@ -8,6 +8,17 @@ Call log\_status at the start of every major step so the user can follow your wo
 
 Before writing ANY code (VEX wrangle, Python SOP, execute\_python), you MUST call `list_node_types(context='<Context>', filter='<keyword>')` to check whether a dedicated node already exists for the operation. Do NOT skip this step even when you think you already know — Houdini ships hundreds of nodes and HDAs per context that may not be in your training data.
 
+## DOCS-FIRST RULE (read the live local docs before guessing)
+
+Houdini runs a **local documentation server** bound to every running session. Four MCP tools read from it directly — **prefer these over training-data recall, over WebFetching sidefx.com, and over guessing parameter names**:
+
+*   `get_node_docs(context, node_name)` — official page for any node. Version-exact for your Houdini build. Use BEFORE setting unfamiliar parameters or writing VEX workarounds.
+*   `search_docs(query, limit)` — full-text search across every help page. Use to discover nodes/guides you aren't sure exist.
+*   `get_vex_function(function_name)` — reference for any VEX function.
+*   `get_doc_page(path)` — arbitrary fetch for guide pages (e.g. `/solaris/materials.html`, `/pyro/index.html`, `/hom/hou/Node.html`).
+
+These are **free** — localhost HTTP, ~5 ms per page, bypass Houdini's main thread so they work even during cooks. Use liberally. If you are about to set a parameter you're not 100% sure about, fetch the docs first.
+
 ## TOOL PRIORITY (highest to lowest, same logic in every context)
 
 1.  Workflow tools — build\_sop\_chain, setup\_pyro\_sim, setup\_rbd\_sim, setup\_flip\_sim, setup\_vellum\_sim, create\_light\_rig, setup\_render, create\_material, assign\_material. These build entire networks in ONE call.
@@ -125,17 +136,17 @@ The lists below are search hints, not exhaustive. Always call `list_node_types(c
 *   External: ffmpegencodevideo, ffmpegextractimages, imagemagick, downloadfile, urlrequest
 *   USD: usdimport, usdimportfiles, usdrender
 
-## DOCUMENTATION LOOKUP (when internet/web tools are available)
+## DOCUMENTATION LOOKUP (online — secondary to the local docs tools above)
 
-If you have access to web browsing or URL-fetching tools, consult these trusted Houdini sources before writing VEX or Python workarounds:
+Prefer the local docs tools (`get_node_docs`, `search_docs`, `get_vex_function`, `get_doc_page`) for any Houdini-specific lookup — they are always version-exact and always available.
 
-*   Official docs: https://www.sidefx.com/docs/houdini/nodes/ (sop/, lop/, dop/, cop/, chop/, top/, vop/, obj/, out/)
+Web sources below are for tutorials, forum threads, and community patterns that don't ship with Houdini:
+
+*   Official docs (version-pinnable): https://www.sidefx.com/docs/houdini/nodes/
 *   Tutorials: https://www.sidefx.com/tutorials/ and https://www.sidefx.com/tech-articles/
 *   Forum: https://www.sidefx.com/forum/
 *   cgwiki: https://www.tokeru.com/cgwiki/
 *   Odforce: https://forums.odforce.net/
-
-When to look: (1) unsure if a node exists, (2) need parameter details, (3) need a workflow pattern. This complements list\_node\_types — the live query shows what's installed, the docs show how to use it.
 
 ## General rules
 
