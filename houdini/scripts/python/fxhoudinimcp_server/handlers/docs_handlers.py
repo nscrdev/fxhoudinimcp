@@ -24,7 +24,7 @@ def get_help_server_url() -> dict:
     """Return the URL of Houdini's local help server.
 
     Discovery methods, tried in order:
-      1. HScript ``helpserverurl`` command (primary — works on all versions).
+      1. ``hou.helpServerUrl()`` — the official Python API (H20+).
       2. ``HOUDINI_HELPSERVER_PORT`` env var (fallback).
 
     Returns:
@@ -34,11 +34,9 @@ def get_help_server_url() -> dict:
         RuntimeError: if no discovery method returns a valid URL.
     """
     try:
-        out, _err = hou.hscript("helpserverurl")
-        if out:
-            url = out.strip() if isinstance(out, str) else str(out[0]).strip()
-            if url:
-                return {"url": url}
+        url = hou.helpServerUrl()
+        if url:
+            return {"url": url.rstrip("/")}
     except Exception:
         pass
 
