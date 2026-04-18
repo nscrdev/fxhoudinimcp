@@ -57,12 +57,24 @@ async def _get_help_url(ctx: Context, force_refresh: bool = False) -> str:
 
 ###### HTML -> text extraction
 
+# Anchor-link glyphs Houdini injects into every heading (U+23CE return
+# symbol, U+00B6 pilcrow, U+2029 paragraph separator). Stripping these
+# cleans up empty headings and stray symbols in the extracted text.
+_NOISE_CHARS = str.maketrans("", "", "\u23ce\u00b6\u2029")
+
+# Empty-heading cleanup: "## \n" (marker with no content after) survives
+# the per-line strip; drop those trailing orphans after join.
+_EMPTY_HEADING_RE = re.compile(r"^#{1,6}\s*$", re.MULTILINE)
+
+
 class _HelpPageExtractor(HTMLParser):
     """Strip Houdini help HTML down to readable text.
 
-    Extracts the content of ``<main>…</main>``, emits newlines around
-    block-level tags, prepends markdown heading markers, and drops
-    nav/script/style/header/footer/aside chrome entirely.
+    Extracts content inside ``<main>`` when present, falling back to
+    ``<body>`` for pages that don't have a main element (search results,
+    fragments). Emits newlines around block-level tags, prepends markdown
+    heading markers, and drops nav/script/style/header/footer/aside
+    chrome entirely.
     """
 
     _BLOCK_TAGS = {
@@ -72,17 +84,18 @@ class _HelpPageExtractor(HTMLParser):
     _HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
     _SKIP_TAGS = {"script", "style", "nav", "header", "footer", "aside"}
 
-    def __init__(self) -> None:
+    def __init__(self, entry_tag: str = "main") -> None:
         super().__init__()
-        self._in_main = False
+        self._entry_tag = entry_tag
+        self._in_content = False
         self._skip_depth = 0
         self._parts: list[str] = []
 
     def handle_starttag(self, tag: str, attrs) -> None:
-        if tag == "main":
-            self._in_main = True
+        if tag == self._entry_tag:
+            self._in_content = True
             return
-        if not self._in_main:
+        if not self._in_content:
             return
         if tag in self._SKIP_TAGS:
             self._skip_depth += 1
@@ -96,10 +109,10 @@ class _HelpPageExtractor(HTMLParser):
             self._parts.append("\n")
 
     def handle_endtag(self, tag: str) -> None:
-        if tag == "main":
-            self._in_main = False
+        if tag == self._entry_tag:
+            self._in_content = False
             return
-        if not self._in_main:
+        if not self._in_content:
             return
         if tag in self._SKIP_TAGS:
             self._skip_depth = max(0, self._skip_depth - 1)
@@ -108,11 +121,12 @@ class _HelpPageExtractor(HTMLParser):
             self._parts.append("\n")
 
     def handle_data(self, data: str) -> None:
-        if self._in_main and not self._skip_depth:
-            self._parts.append(data)
+        if self._in_content and not self._skip_depth:
+            self._parts.append(data.translate(_NOISE_CHARS))
 
     def get_text(self) -> str:
         raw = "".join(self._parts)
+        raw = _EMPTY_HEADING_RE.sub("", raw)
         lines = [ln.strip() for ln in raw.splitlines()]
         cleaned: list[str] = []
         blank_run = 0
@@ -128,9 +142,50 @@ class _HelpPageExtractor(HTMLParser):
 
 
 def _html_to_text(html: str) -> str:
-    parser = _HelpPageExtractor()
+    """Extract readable text from a Houdini help page.
+
+    Prefers the ``<main>`` region; falls back to ``<body>`` for fragment
+    responses (e.g. ``/_search``) that lack a main element.
+    """
+    entry = "main" if "<main" in html else "body"
+    parser = _HelpPageExtractor(entry_tag=entry)
     parser.feed(html)
     return parser.get_text()
+
+
+###### Optional html2text backend for prettier markdown output
+
+try:
+    import html2text as _html2text_mod  # type: ignore[import-not-found]
+    _HAS_HTML2TEXT = True
+except ImportError:
+    _HAS_HTML2TEXT = False
+
+
+def _html_to_markdown(html: str) -> str:
+    """Convert help HTML to markdown via html2text (preserves links/tables).
+
+    Produces ~5-10x more output than ``_html_to_text`` because it keeps
+    breadcrumb nav and cross-reference tooltips. Use when you want
+    prettier formatting for display; prefer plain text for LLM input.
+    """
+    if not _HAS_HTML2TEXT:
+        raise RuntimeError(
+            "format='markdown' requires html2text. "
+            "Install with: pip install 'fxhoudinimcp[docs-markdown]'"
+        )
+    h = _html2text_mod.HTML2Text()
+    h.body_width = 0  # disable line wrapping
+    h.ignore_images = True
+    h.skip_internal_links = True
+    return h.handle(html)
+
+
+def _render(html: str, format: str) -> str:
+    """Route to plain-text or markdown renderer based on caller preference."""
+    if format == "markdown":
+        return _html_to_markdown(html)
+    return _html_to_text(html)
 
 
 ###### HTTP fetch with port-refresh fallback
@@ -160,13 +215,21 @@ async def _fetch(ctx: Context, path: str) -> str:
 
 ###### Search result parsing
 
+# Houdini's /_search response nests each hit as:
+#   <div class="hit  ">
+#     <p class="label">
+#       <a class="label" href="/nodes/sop/voronoifracture">Voronoi Fracture</a>
+#       <small class="desc">in Geometry nodes</small>
+#     </p>
+#   </div>
+# We deliberately match `class="hit\s*"` (trailing whitespace only) so we
+# skip `class="hit findpage"` which is the "Open on separate page" entry.
 _SEARCH_HIT_RE = re.compile(
-    r'<div[^>]*class="[^"]*hit[^"]*"[^>]*data-path="([^"]*)"[^>]*>(.*?)</div>\s*</div>',
+    r'<div[^>]*class="hit\s*"[^>]*>\s*'
+    r'<p[^>]*class="label"[^>]*>\s*'
+    r'<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>'
+    r'(?:\s*<small[^>]*class="desc"[^>]*>(.*?)</small>)?',
     re.DOTALL,
-)
-_LINK_RE = re.compile(r"<a[^>]*>(.*?)</a>", re.DOTALL)
-_SNIPPET_RE = re.compile(
-    r'<p[^>]*class="[^"]*snippet[^"]*"[^>]*>(.*?)</p>', re.DOTALL
 )
 _TAG_RE = re.compile(r"<[^>]+>")
 
@@ -180,14 +243,11 @@ def _parse_search_results(html: str, limit: int) -> list[dict]:
     for match in _SEARCH_HIT_RE.finditer(html):
         if len(hits) >= limit:
             break
-        path = match.group(1)
-        body = match.group(2)
-        title_m = _LINK_RE.search(body)
-        snippet_m = _SNIPPET_RE.search(body)
+        href, title_html, desc_html = match.group(1), match.group(2), match.group(3)
         hits.append({
-            "path": path,
-            "title": _strip_tags(title_m.group(1)) if title_m else path,
-            "snippet": _strip_tags(snippet_m.group(1)) if snippet_m else "",
+            "path": href,
+            "title": _strip_tags(title_html) or href,
+            "desc": _strip_tags(desc_html) if desc_html else "",
         })
     return hits
 
@@ -199,6 +259,7 @@ async def get_node_docs(
     ctx: Context,
     context: str,
     node_name: str,
+    format: str = "plain",
 ) -> dict:
     """Fetch the official documentation for a Houdini node.
 
@@ -212,6 +273,9 @@ async def get_node_docs(
                  "top", "vop", "obj", "out", "apex".
         node_name: Internal node type name (e.g. "box", "scatter",
                    "pyrosolver", "karmarendersettings", "voronoifracture").
+        format: "plain" (default, token-efficient) or "markdown" (preserves
+                links/tables, requires the optional html2text dep — install
+                with ``pip install 'fxhoudinimcp[docs-markdown]'``).
     """
     ctx_norm = context.lower().strip()
     name_norm = node_name.lower().strip()
@@ -221,7 +285,8 @@ async def get_node_docs(
         "context": ctx_norm,
         "node_name": name_norm,
         "path": path,
-        "text": _html_to_text(html),
+        "format": format,
+        "text": _render(html, format),
     }
 
 
@@ -249,21 +314,35 @@ async def search_docs(
 
 
 @mcp.tool()
-async def get_vex_function(ctx: Context, function_name: str) -> dict:
+async def get_vex_function(
+    ctx: Context,
+    function_name: str,
+    format: str = "plain",
+) -> dict:
     """Fetch documentation for a VEX function.
 
     Args:
         function_name: VEX function name (e.g. "ch", "chf", "xyzdist",
                        "point", "addpoint", "nearpoints").
+        format: "plain" (default) or "markdown" — see get_node_docs.
     """
     name = function_name.lower().strip()
     path = f"/vex/functions/{quote(name)}.html"
     html = await _fetch(ctx, path)
-    return {"function_name": name, "path": path, "text": _html_to_text(html)}
+    return {
+        "function_name": name,
+        "path": path,
+        "format": format,
+        "text": _render(html, format),
+    }
 
 
 @mcp.tool()
-async def get_doc_page(ctx: Context, path: str) -> dict:
+async def get_doc_page(
+    ctx: Context,
+    path: str,
+    format: str = "plain",
+) -> dict:
     """Fetch an arbitrary page from Houdini's local help server.
 
     Use for guide pages that are not node or VEX docs — e.g.
@@ -272,8 +351,9 @@ async def get_doc_page(ctx: Context, path: str) -> dict:
 
     Args:
         path: URL path beginning with "/" (e.g. "/solaris/materials.html").
+        format: "plain" (default) or "markdown" — see get_node_docs.
     """
     if not path.startswith("/"):
         path = "/" + path
     html = await _fetch(ctx, path)
-    return {"path": path, "text": _html_to_text(html)}
+    return {"path": path, "format": format, "text": _render(html, format)}

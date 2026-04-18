@@ -34,6 +34,9 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.8.0",
 ]
+docs-markdown = [
+    "html2text>=2024.2.26",
+]
 mkdocs = [
     "mkdocs-material",
     "mkdocs-gen-files",
