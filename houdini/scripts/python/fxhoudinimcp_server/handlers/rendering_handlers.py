@@ -54,7 +54,7 @@ def _find_flipbook_output(output_path: str, frame: float) -> str:
 
 
 def render_viewport(
-    output_path: str,
+    output_path: str = None,
     resolution: list = None,
     camera: str = None,
 ) -> dict:
@@ -62,9 +62,14 @@ def render_viewport(
 
     Args:
         output_path: Destination image path (e.g. .png, .jpg, .exr).
+            If not provided, saves to a temp directory.
         resolution: Optional [width, height] override.
         camera: Optional camera node path to look through before capture.
     """
+    if output_path is None:
+        from fxhoudinimcp_server.handlers.viewport_handlers import _default_capture_path
+        output_path = _default_capture_path("viewport")
+
     # Ensure the output directory exists
     out_dir = os.path.dirname(output_path)
     if out_dir and not os.path.isdir(out_dir):
@@ -132,15 +137,19 @@ def render_viewport(
 ###### rendering.render_quad_view
 
 def render_quad_view(
-    output_path: str,
+    output_path: str = None,
     resolution: list = None,
 ) -> dict:
     """Capture all four viewport panes (quad view) to an image file.
 
     Args:
-        output_path: Destination image path.
+        output_path: Destination image path. If not provided, saves to a temp directory.
         resolution: Optional [width, height] override.
     """
+    if output_path is None:
+        from fxhoudinimcp_server.handlers.viewport_handlers import _default_capture_path
+        output_path = _default_capture_path("quad_view")
+
     out_dir = os.path.dirname(output_path)
     if out_dir and not os.path.isdir(out_dir):
         os.makedirs(out_dir, exist_ok=True)
@@ -481,17 +490,21 @@ def start_render(
 
 def render_node_network(
     node_path: str,
-    output_path: str,
+    output_path: str = None,
 ) -> dict:
     """Take a screenshot of the network editor showing a specific node's network.
 
     Args:
         node_path: Path to the node whose network to capture.
-        output_path: Destination image path.
+        output_path: Destination image path. If not provided, saves to a temp directory.
     """
     node = hou.node(node_path)
     if node is None:
         raise ValueError(f"Node not found: {node_path}")
+
+    if output_path is None:
+        from fxhoudinimcp_server.handlers.viewport_handlers import _default_capture_path
+        output_path = _default_capture_path("node_network")
 
     out_dir = os.path.dirname(output_path)
     if out_dir and not os.path.isdir(out_dir):

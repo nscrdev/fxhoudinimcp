@@ -21,19 +21,21 @@ from fxhoudinimcp.tools import result_with_image
 @mcp.tool()
 async def render_viewport(
     ctx: Context,
-    output_path: str,
+    output_path: str | None = None,
     resolution: list[int] | None = None,
     camera: str | None = None,
 ) -> list[TextContent | ImageContent]:
     """Capture the current 3D viewport to an image file.
 
     Args:
-        output_path: Image file path.
+        output_path: Image file path. If omitted, saves to a temp directory.
         resolution: [width, height] in pixels.
         camera: Camera node path.
     """
     bridge = _get_bridge(ctx)
-    params: dict[str, Any] = {"output_path": output_path}
+    params: dict[str, Any] = {}
+    if output_path is not None:
+        params["output_path"] = output_path
     if resolution is not None:
         params["resolution"] = resolution
     if camera is not None:
@@ -45,17 +47,19 @@ async def render_viewport(
 @mcp.tool()
 async def render_quad_view(
     ctx: Context,
-    output_path: str,
+    output_path: str | None = None,
     resolution: list[int] | None = None,
 ) -> dict:
     """Capture all four viewport panes to separate images.
 
     Args:
-        output_path: Base image path; viewport names are appended.
+        output_path: Base image path; viewport names are appended. If omitted, saves to a temp directory.
         resolution: [width, height] in pixels.
     """
     bridge = _get_bridge(ctx)
-    params: dict[str, Any] = {"output_path": output_path}
+    params: dict[str, Any] = {}
+    if output_path is not None:
+        params["output_path"] = output_path
     if resolution is not None:
         params["resolution"] = resolution
     return await bridge.execute("rendering.render_quad_view", params)
@@ -150,19 +154,19 @@ async def start_render(
 async def render_node_network(
     ctx: Context,
     node_path: str,
-    output_path: str,
+    output_path: str | None = None,
 ) -> dict:
     """Capture a screenshot of a node's network editor view.
 
     Args:
         node_path: Node path to focus on.
-        output_path: Image file path.
+        output_path: Image file path. If omitted, saves to a temp directory.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute(
-        "rendering.render_node_network",
-        {"node_path": node_path, "output_path": output_path},
-    )
+    params: dict[str, Any] = {"node_path": node_path}
+    if output_path is not None:
+        params["output_path"] = output_path
+    return await bridge.execute("rendering.render_node_network", params)
 
 
 @mcp.tool()

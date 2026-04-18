@@ -11,6 +11,8 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import tempfile
+import time
 
 # Third-party
 import hou
@@ -20,7 +22,6 @@ from fxhoudinimcp_server.dispatcher import register_handler
 
 logger = logging.getLogger(__name__)
 
-# Maximum image dimension (width or height) before automatic downscaling.
 # Keep this low — a 1024px JPEG base64-encodes to ~100-300 KB of ASCII text,
 # which costs tens of thousands of LLM tokens per screenshot.
 _MAX_IMAGE_DIM = 512
@@ -28,6 +29,14 @@ _JPEG_QUALITY = 60
 # Hard cap on the base64 payload in bytes. If the compressed JPEG still
 # exceeds this, re-encode at lower quality until it fits.
 _MAX_BASE64_BYTES = 80_000  # ~80 KB → ~20 K tokens
+_CAPTURE_TEMP_DIR = os.path.join(tempfile.gettempdir(), "fxhoudinimcp")
+
+
+def _default_capture_path(prefix: str = "capture") -> str:
+    """Generate a unique file path in a temp directory for image captures."""
+    os.makedirs(_CAPTURE_TEMP_DIR, exist_ok=True)
+    timestamp = int(time.time() * 1000)
+    return os.path.join(_CAPTURE_TEMP_DIR, f"{prefix}_{timestamp}.png")
 
 
 def _downscale_and_encode(file_path: str) -> tuple[str | None, str]:
@@ -498,16 +507,19 @@ def frame_all(pane_name: str = None) -> dict:
 ###### viewport.capture_screenshot
 
 def capture_screenshot(
-    output_path: str,
+    output_path: str = None,
     pane_name: str = None,
 ) -> dict:
     """Capture a screenshot of a specific pane tab, or the active viewport.
 
     Args:
-        output_path: Destination image path.
+        output_path: Destination image path. If not provided, saves to a temp directory.
         pane_name: Name of the pane tab to capture. If not provided,
             captures the first Scene Viewer found.
     """
+    if output_path is None:
+        output_path = _default_capture_path("screenshot")
+
     out_dir = os.path.dirname(output_path)
     if out_dir and not os.path.isdir(out_dir):
         os.makedirs(out_dir, exist_ok=True)
@@ -555,15 +567,18 @@ def capture_screenshot(
 ###### viewport.capture_network_editor
 
 def capture_network_editor(
-    output_path: str,
+    output_path: str = None,
     node_path: str = None,
 ) -> dict:
     """Capture a screenshot of the network editor.
 
     Args:
-        output_path: Destination image path.
+        output_path: Destination image path. If not provided, saves to a temp directory.
         node_path: Optional node path to navigate to before capture.
     """
+    if output_path is None:
+        output_path = _default_capture_path("network_editor")
+
     out_dir = os.path.dirname(output_path)
     if out_dir and not os.path.isdir(out_dir):
         os.makedirs(out_dir, exist_ok=True)

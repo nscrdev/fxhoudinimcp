@@ -160,7 +160,7 @@ async def set_viewport_direction(
 @mcp.tool()
 async def capture_screenshot(
     ctx: Context,
-    output_path: str,
+    output_path: str | None = None,
     pane_name: str | None = None,
 ) -> list[TextContent | ImageContent]:
     """Capture a screenshot of the viewport or a specific pane tab.
@@ -170,11 +170,13 @@ async def capture_screenshot(
     or get_scene_summary for most inspection tasks.
 
     Args:
-        output_path: Image file path.
+        output_path: Image file path. If omitted, saves to a temp directory.
         pane_name: Pane tab name.
     """
     bridge = _get_bridge(ctx)
-    params: dict[str, Any] = {"output_path": output_path}
+    params: dict[str, Any] = {}
+    if output_path is not None:
+        params["output_path"] = output_path
     if pane_name is not None:
         params["pane_name"] = pane_name
     result = await bridge.execute("viewport.capture_screenshot", params)
@@ -184,7 +186,7 @@ async def capture_screenshot(
 @mcp.tool()
 async def capture_network_editor(
     ctx: Context,
-    output_path: str,
+    output_path: str | None = None,
     node_path: str | None = None,
 ) -> list[TextContent | ImageContent]:
     """Capture a screenshot of the network editor.
@@ -194,11 +196,13 @@ async def capture_network_editor(
     list_children for inspecting node connections.
 
     Args:
-        output_path: Image file path.
+        output_path: Image file path. If omitted, saves to a temp directory.
         node_path: Node path to navigate to before capture.
     """
     bridge = _get_bridge(ctx)
-    params: dict[str, Any] = {"output_path": output_path}
+    params: dict[str, Any] = {}
+    if output_path is not None:
+        params["output_path"] = output_path
     if node_path is not None:
         params["node_path"] = node_path
     result = await bridge.execute("viewport.capture_network_editor", params)
