@@ -1,0 +1,5 @@
+interface:
+  display_name: "Houdini Simulation"
+  short_description: "Set up Pyro, FLIP, RBD, Vellum, and related sims"
+  default_prompt: "Use $houdini-simulation to set up a Houdini simulation with native workflow tools and solver nodes."
+

@@ -1,0 +1,5 @@
+interface:
+  display_name: "Houdini Debug Scene"
+  short_description: "Troubleshoot Houdini scene and network failures"
+  default_prompt: "Use $houdini-debug-scene to systematically inspect a Houdini scene, find failing nodes, and diagnose the root cause."
+

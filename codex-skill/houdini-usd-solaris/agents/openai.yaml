@@ -1,0 +1,5 @@
+interface:
+  display_name: "Houdini USD Solaris"
+  short_description: "Build USD scenes and lookdev setups in LOPs"
+  default_prompt: "Use $houdini-usd-solaris to assemble a Solaris scene in /stage with native LOP nodes, USD materials, and viewport-first lookdev."
+

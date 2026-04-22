@@ -226,6 +226,31 @@ Or to scope it to a single project, add a `.mcp.json` in the project root:
 >
 > Then use the result in your config, e.g. `"command": "C:\\Program Files\\Python311\\python.exe"`.
 > After any config change, fully quit Claude Desktop (system tray → Quit) and relaunch.
+
+**Codex** (MCP server + repo-scoped skills):
+
+```shell
+codex mcp add fxhoudini --env HOUDINI_HOST=localhost --env HOUDINI_PORT=8100 -- python -m fxhoudinimcp
+```
+
+This repo also includes Codex skills for natural-language workflow triggering in
+[`codex-skill/`](codex-skill/). The repo uses `.agents/skills` as the Codex
+discovery path, pointing at that folder so the repo copy stays the source of truth.
+
+Available Codex skills:
+
+- `houdini-procedural-modeling`
+- `houdini-simulation`
+- `houdini-usd-solaris`
+- `houdini-debug-scene`
+- `houdini-hda`
+- `houdini-pdg`
+
+These complement the MCP server tools:
+
+- The MCP server gives Codex access to Houdini tools, resources, and prompts.
+- The Codex skills provide semantic, natural-language workflow triggering without
+  requiring an explicit slash-command prompt invocation.
 <!-- --8<-- [end:installation] -->
 
 <!-- USAGE -->

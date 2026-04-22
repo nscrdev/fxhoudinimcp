@@ -1,0 +1,4 @@
+interface:
+  display_name: "Houdini PDG"
+  short_description: "Build and inspect TOPs and PDG pipelines"
+  default_prompt: "Use $houdini-pdg to build a Houdini TOPs or PDG task graph with native nodes and clean dependency planning."

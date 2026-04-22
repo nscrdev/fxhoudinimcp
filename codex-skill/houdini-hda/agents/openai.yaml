@@ -1,0 +1,5 @@
+interface:
+  display_name: "Houdini HDA"
+  short_description: "Create and refine Houdini Digital Assets"
+  default_prompt: "Use $houdini-hda to turn a Houdini subnet into a reusable digital asset with promoted parameters and clean packaging."
+

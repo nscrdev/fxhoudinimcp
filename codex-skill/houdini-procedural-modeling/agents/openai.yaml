@@ -1,0 +1,5 @@
+interface:
+  display_name: "Houdini Procedural Modeling"
+  short_description: "Build SOP node chains for procedural geometry"
+  default_prompt: "Use $houdini-procedural-modeling to build a Houdini SOP network with visible native nodes instead of jumping to VEX."
+

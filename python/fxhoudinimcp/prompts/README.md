@@ -39,3 +39,11 @@ MCP prompts and Claude Code skills trigger differently:
 - **Claude Code skills** — their `description` field is in my system prompt at session start, so I pattern-match against natural language and auto-invoke. They work **only in Claude Code**.
 
 Both mechanisms coexist. The MCP prompts stay in this repo for portability; the skills are a Claude Code convenience layer on top.
+
+## Codex skills
+
+For Codex, the mirrored workflow skills live in the repo-local
+[`codex-skill/`](../../../codex-skill/) folder instead of `~/.claude/skills/`.
+They are discovered through the repo's `.agents/skills` path so the checked-in
+repo copy stays the source of truth. See the Codex setup note in the main
+[`README.md`](../../../README.md) installation section.
