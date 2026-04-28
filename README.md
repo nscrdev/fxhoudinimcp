@@ -9,7 +9,7 @@
   <p align="center">
     The most comprehensive MCP server for SideFX Houdini.
     <br/>
-    168 tools across 19 categories, covering every major Houdini context.
+    172 tools across 21 categories, covering every major Houdini context.
     <br/><br/>
   </p>
 
@@ -44,6 +44,7 @@
 - [Architecture](#architecture)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Documentation Lookup](#documentation-lookup)
 - [Environment Variables](#environment-variables)
 - [Development](#development)
 - [Contact](#contact)
@@ -53,7 +54,14 @@
 
 A comprehensive [MCP](https://modelcontextprotocol.io/) (Model Context Protocol) server for [SideFX Houdini](https://www.sidefx.com/). Connects AI assistants like Claude directly to Houdini's Python API, enabling natural language control over scene building, simulation setup, rendering, and more.
 
-**168 tools**, **8 resources**, and **6 workflow prompts** out of the box.
+**172 tools**, **8 resources**, and **6 workflow prompts** out of the box.
+
+### What's new in this fork (`nscrdev/fxhoudinimcp`)
+
+- **Version-exact documentation lookup** — four new tools (`get_node_docs`, `search_docs`, `get_vex_function`, `get_doc_page`) that read directly from Houdini's built-in local help server instead of WebFetching `sidefx.com`. The assistant gets reference for *the Houdini build that's actually running*, with no internet dependency. See [Documentation Lookup](#documentation-lookup) below.
+- **Optional `markdown` docs backend** via `pip install 'fxhoudinimcp[docs-markdown]'` — default `plain` extractor stays ~10× more token-efficient.
+- **Optional `output_path`** on `capture_screenshot`, `capture_network_editor`, `render_viewport`, `render_quad_view`, and `render_node_network` — defaults to a temp directory.
+- **Codex skills** for natural-language workflow triggering (see [Installation](#3-configure-your-mcp-client)).
 
 <!-- FEATURES -->
 ## Features
@@ -80,6 +88,7 @@ A comprehensive [MCP](https://modelcontextprotocol.io/) (Model Context Protocol)
 | **CHOPs** | 4 | Channel data, CHOP nodes, export channels to parameters |
 | **Cache** | 4 | List, inspect, clear, write file caches |
 | **Takes** | 4 | List, create, switch takes with parameter overrides |
+| **Documentation** | 4 | Fetch node/VEX/page docs and full-text search from Houdini's local help server |
 
 <!-- ARCHITECTURE -->
 ## Architecture
@@ -95,7 +104,7 @@ flowchart LR
 
     subgraph MCP[" ⚡ FXHoudini MCP Server "]
         direction TB
-        B1("🔧 168 Tools")
+        B1("🔧 172 Tools")
         B2("📦 8 Resources")
         B3("💬 6 Prompts")
     end
@@ -268,6 +277,26 @@ Once connected, your AI assistant can:
 "Debug why my scene has cooking errors"
 ```
 
+<!-- DOCUMENTATION LOOKUP -->
+## Documentation Lookup
+
+Houdini ships a built-in HTTP help server that serves the same pages as `sidefx.com/docs` but for the **exact Houdini build that's running**. This fork exposes that server through four MCP tools so the assistant can consult node parameters, VEX signatures, and Solaris/Pyro guides without guessing from training data or hitting the public website.
+
+| Tool | Purpose |
+|------|---------|
+| `get_node_docs(context, node_name)` | Official page for any node (e.g. `Sop`, `scatter`) |
+| `search_docs(query, limit)` | Full-text search across the help corpus |
+| `get_vex_function(function_name)` | VEX reference by name |
+| `get_doc_page(path)` | Arbitrary page (e.g. `/solaris/materials.html`) |
+
+How it works:
+
+- The MCP process discovers the help-server URL once via `hou.helpServerUrl()` (cached for the session, re-discovered on connection failure to survive Houdini restarts).
+- Subsequent fetches use `httpx` against `localhost` directly — they bypass Houdini's main thread, so docs still return in ~5 ms during an active cook.
+- Default `format="plain"` runs a stdlib HTML→text extractor tuned for Houdini's pages (~98% size reduction, parameters/examples/see-also preserved). Pass `format="markdown"` for human-facing display if you've installed the optional `[docs-markdown]` extra.
+
+The bundled `server_instructions.md` includes a **DOCS-FIRST RULE** telling the assistant to consult these tools before setting unfamiliar parameters or writing VEX workarounds, instead of fabricating from memory.
+
 <!-- ENVIRONMENT VARIABLES -->
 ## Environment Variables
 
@@ -298,7 +327,7 @@ pytest
 
 1. **Houdini Plugin** (`houdini/`): Runs inside Houdini's Python environment. Registers `@hwebserver.apiFunction` endpoints that receive JSON commands. Uses `hdefereval.executeInMainThreadWithResult()` to safely execute `hou.*` calls on the main thread.
 
-2. **MCP Server** (`python/fxhoudinimcp/`): A standalone Python process using FastMCP. Exposes 167 tools, 8 resources, and 6 prompts via the MCP protocol. Forwards tool calls to Houdini over HTTP.
+2. **MCP Server** (`python/fxhoudinimcp/`): A standalone Python process using FastMCP. Exposes 172 tools, 8 resources, and 6 prompts via the MCP protocol. Forwards tool calls to Houdini over HTTP. Documentation tools fetch from Houdini's local help server directly over `localhost`, bypassing the main thread.
 
 3. **Bridge** (`python/fxhoudinimcp/bridge.py`): Async HTTP client that sends commands to Houdini's hwebserver and deserializes responses. Handles connection errors and timeouts.
 
