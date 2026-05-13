@@ -1,0 +1,5 @@
+interface:
+  display_name: "Houdini Cleanup"
+  short_description: "Rename Houdini node graphs for readable handoff"
+  default_prompt: "Use $houdini-cleanup to rename nodes in a Houdini network with descriptive Houdini-safe names without changing graph behavior."
+

@@ -18,6 +18,8 @@ Skills are a Claude Code-only feature — they are NOT part of this MCP package 
 | `debug_scene.md`          | `houdini-debug-scene/SKILL.md`            | "broken", "find errors", "nothing showing", "sim exploding"            |
 | `hda_development.md`      | `houdini-hda/SKILL.md`                    | "turn this into an HDA", "promote parameters"                          |
 | `pdg_pipeline.md`         | `houdini-pdg/SKILL.md`                    | /tasks, wedge, batch render, ROP Fetch, FFmpeg encode                  |
+| `omniverse_prep.md`       | `houdini-omniverse-prep/SKILL.md`         | Omniverse, USD Composer/Explorer, Isaac Sim, "Cannot find node" / "Ill-formed SdfPath" errors, dual-surface, orphan displacement |
+| `houdini_cleanup.md`      | `houdini-cleanup/SKILL.md`                | Houdini cleanup, rename nodes, descriptive names, handoff-ready graph |
 | `network_housekeeping.md` | *(inlined into each skill)*               | shared snippet — skills have no interpolation, so it's copy-pasted in  |
 | `server_instructions.md`  | *(not mirrored)*                          | auto-loaded on every MCP session as the server's system instructions   |
 
@@ -29,7 +31,7 @@ The MCP prompts are the **source of truth**. Skills drift out of sync if you edi
 2. Edit `~/.claude/skills/<skill-name>/SKILL.md` to match.
 3. If you changed `network_housekeeping.md`, re-inline it into every skill (they each carry their own copy since Claude skills have no template interpolation).
 
-If the drift becomes annoying, a sync script that regenerates all six `SKILL.md` files from the MCP prompt sources + a fixed frontmatter template would be straightforward to add.
+If the drift becomes annoying, a sync script that regenerates all mirrored `SKILL.md` files from the MCP prompt sources + a fixed frontmatter template would be straightforward to add.
 
 ### Why mirror at all?
 

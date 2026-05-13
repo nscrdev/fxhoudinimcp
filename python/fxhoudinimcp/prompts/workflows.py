@@ -107,3 +107,39 @@ def debug_scene(
         "debug_scene.md",
         problem_description=problem_description,
     )
+
+
+@mcp.prompt()
+def omniverse_prep(
+    scene_description: str = "general Omniverse export prep",
+    target_app: str = "USD Composer",
+) -> str:
+    """Pre-flight checklist for exporting a Houdini scene to NVIDIA Omniverse.
+
+    Args:
+        scene_description: What is being prepared / context for the export
+        target_app: Target Omniverse app (USD Composer, USD Explorer, Isaac Sim, etc.)
+    """
+    return load_markdown(
+        "omniverse_prep.md",
+        scene_description=scene_description,
+        target_app=target_app,
+    )
+
+
+@mcp.prompt()
+def houdini_cleanup(
+    network_path: str,
+    scope: str = "top_level_only",
+) -> str:
+    """Houdini cleanup: rename nodes to descriptive snake_case names for handoff (rename only).
+
+    Args:
+        network_path: Parent network path (e.g. /stage/sopcreate1/sopnet/create or /obj/geo1)
+        scope: top_level_only (default) or include_subnets
+    """
+    return load_markdown(
+        "houdini_cleanup.md",
+        network_path=network_path,
+        scope=scope,
+    )

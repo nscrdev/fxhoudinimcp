@@ -54,7 +54,7 @@
 
 A comprehensive [MCP](https://modelcontextprotocol.io/) (Model Context Protocol) server for [SideFX Houdini](https://www.sidefx.com/). Connects AI assistants like Claude directly to Houdini's Python API, enabling natural language control over scene building, simulation setup, rendering, and more.
 
-**172 tools**, **8 resources**, and **6 workflow prompts** out of the box.
+**172 tools**, **8 resources**, and **7 workflow prompts** out of the box.
 
 ### What's new in this fork (`nscrdev/fxhoudinimcp`)
 
@@ -254,6 +254,8 @@ Available Codex skills:
 - `houdini-debug-scene`
 - `houdini-hda`
 - `houdini-pdg`
+- `houdini-omniverse-prep`
+- `houdini-cleanup`
 
 These complement the MCP server tools:
 
@@ -327,7 +329,7 @@ pytest
 
 1. **Houdini Plugin** (`houdini/`): Runs inside Houdini's Python environment. Registers `@hwebserver.apiFunction` endpoints that receive JSON commands. Uses `hdefereval.executeInMainThreadWithResult()` to safely execute `hou.*` calls on the main thread.
 
-2. **MCP Server** (`python/fxhoudinimcp/`): A standalone Python process using FastMCP. Exposes 172 tools, 8 resources, and 6 prompts via the MCP protocol. Forwards tool calls to Houdini over HTTP. Documentation tools fetch from Houdini's local help server directly over `localhost`, bypassing the main thread.
+2. **MCP Server** (`python/fxhoudinimcp/`): A standalone Python process using FastMCP. Exposes 172 tools, 8 resources, and 7 prompts via the MCP protocol. Forwards tool calls to Houdini over HTTP. Documentation tools fetch from Houdini's local help server directly over `localhost`, bypassing the main thread.
 
 3. **Bridge** (`python/fxhoudinimcp/bridge.py`): Async HTTP client that sends commands to Houdini's hwebserver and deserializes responses. Handles connection errors and timeouts.
 
