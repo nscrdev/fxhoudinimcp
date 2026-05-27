@@ -67,6 +67,12 @@ async def delete_node(ctx: Context, node_path: str) -> dict:
 async def rename_node(ctx: Context, node_path: str, new_name: str) -> dict:
     """Rename a node.
 
+    For graph-cleanup workflows that touch more than one node at a time,
+    prefer ``bulk_rename_nodes``: it pre-flights safety + collisions for
+    the whole plan, applies renames atomically (with rollback on failure),
+    and runs a cascade scan for `ch()` / `chs()` / `op:` references that
+    would break.
+
     Args:
         ctx: MCP context.
         node_path: Node path.
@@ -80,6 +86,119 @@ async def rename_node(ctx: Context, node_path: str, new_name: str) -> dict:
             "new_name": new_name,
         },
     )
+
+
+@mcp.tool()
+async def classify_node_for_rename(ctx: Context, node_path: str) -> dict:
+    """Decide whether a node is safe to rename for graph-cleanup purposes.
+
+    Centralises the houdini-cleanup safety rules in a single server-side
+    call: container-HDA-wrapper detection, "inside HDA contents" parent
+    walk, plus belt-and-suspenders signals from
+    ``hou.OpNode.isInsideLockedHDA`` and ``hou.Node.isEditable``. Call
+    this before any rename and obey the verdict; ``bulk_rename_nodes``
+    invokes it implicitly when ``enforce_safety=True``.
+
+    Verdict reasons:
+        ok                          — safe to rename.
+        node_not_found              — path did not resolve to any node.
+        is_root_or_manager          — root "/" or a top-level manager
+                                      (/obj, /out, /stage, ...). Cannot
+                                      be renamed by the engine.
+        is_container_hda_wrapper    — asset definition exists AND its
+                                      type allows children. Renaming
+                                      this changes the asset's contract.
+        inside_hda_contents         — an ancestor is a container HDA
+                                      wrapper, so this node is inside
+                                      that asset's editable contents.
+        inside_locked_hda           — node is inside a locked HDA
+                                      (``isInsideLockedHDA() == True``).
+        not_editable                — ``isEditable() == False`` for
+                                      reasons not covered above.
+
+    Args:
+        ctx: MCP context.
+        node_path: Absolute node path to classify.
+    """
+    bridge = _get_bridge(ctx)
+    return await bridge.execute(
+        "nodes.classify_node_for_rename",
+        {"node_path": node_path},
+    )
+
+
+@mcp.tool()
+async def bulk_rename_nodes(
+    ctx: Context,
+    plan: list,
+    enforce_safety: bool = True,
+    trust_selection: bool = False,
+    scan_cascades: bool = True,
+    dry_run: bool = False,
+    network_scope: Optional[str] = None,
+) -> dict:
+    """Rename multiple nodes atomically, with safety pre-flight and cascade scan.
+
+    Designed for the houdini-cleanup workflow. Closes failure modes that
+    rule-only enforcement leaves open:
+
+      * Atomicity — the whole plan applies or nothing applies. Mid-batch
+        failure rolls back all renames already committed via a
+        placeholder pass.
+      * Collisions — pre-flight detects intra-batch collisions and
+        out-of-batch collisions with siblings. The execution phase
+        renames every entry to a unique placeholder first, then to its
+        final name, so cycles like A↔B succeed.
+      * Safety — when ``enforce_safety=True`` (default), every entry
+        is run through ``classify_node_for_rename`` and any verdict
+        other than ``ok`` blocks the whole batch (subject to the
+        ``trust_selection`` downgrade below).
+      * Cascade impact — when ``scan_cascades=True`` (default), every
+        string parameter under ``network_scope`` is scanned for
+        ``ch()`` / ``chs()`` / ``op:`` / ``soppath`` / raw path
+        references to old base names. Hits are reported as warnings
+        (never blockers) so the user can decide.
+
+    The mixed-parent guard always applies (independent of every flag):
+    if the plan's entries don't all share the same immediate parent,
+    the whole batch is refused with a single top-level
+    ``mixed_parents`` blocker (``node_path: None``,
+    ``details.parent_paths: [...]``). Cleanup touches one network at a
+    time.
+
+    Args:
+        ctx: MCP context.
+        plan: List of dicts: ``[{"node_path": str, "new_name": str}, ...]``.
+        enforce_safety: Run ``classify_node_for_rename`` on every entry
+            and block the batch on any non-``ok`` verdict. Default True.
+        trust_selection: When True, the verdicts
+            ``is_container_hda_wrapper`` and ``inside_hda_contents`` are
+            silently allowed — they do NOT appear in ``blocked`` and do
+            NOT generate any warning. Use this when the rename targets
+            came from an explicit user selection (the user is the
+            authority on what they meant to pick). Engine-level blockers
+            (``inside_locked_hda``, ``not_editable``,
+            ``is_root_or_manager``, ``node_not_found``) and collision
+            detection still apply. Default False. Has no effect when
+            ``enforce_safety=False``.
+        scan_cascades: Scan parameters under ``network_scope`` for
+            references to old base names. Default True.
+        dry_run: Run pre-flight + cascade scan only — never mutate the
+            scene. Default False.
+        network_scope: Root path for the cascade scan. Defaults to the
+            deepest common parent of the plan's node paths.
+    """
+    bridge = _get_bridge(ctx)
+    params: dict = {
+        "plan": plan,
+        "enforce_safety": enforce_safety,
+        "trust_selection": trust_selection,
+        "scan_cascades": scan_cascades,
+        "dry_run": dry_run,
+    }
+    if network_scope is not None:
+        params["network_scope"] = network_scope
+    return await bridge.execute("nodes.bulk_rename_nodes", params)
 
 
 @mcp.tool()

@@ -47,4 +47,4 @@ If the Houdini MCP tools are unavailable, say so briefly and continue only with 
 
 - Call `log_status` for each major diagnosis step.
 - Call `set_current_network` when changing debugging context.
-- Call `layout_children` after cleanup or rewiring so the repaired graph remains readable.
+- Preserve existing node positions. Do not call `layout_children` after cleanup or rewiring unless the user explicitly asks for layout/cleanup, or unless you are working inside a newly created isolated parent network/subnet.

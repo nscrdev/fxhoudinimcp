@@ -227,6 +227,24 @@ async def set_current_network(
 
 
 @mcp.tool()
+async def get_current_network_path(ctx: Context) -> dict:
+    """Return the network path the user currently has open in the network editor.
+
+    Reports the focused NetworkEditor pane's ``current_path`` plus any other
+    NetworkEditor panes as ``alternates``. Use this in cleanup / rename
+    workflows to disambiguate the user's intended target without parsing the
+    full ``list_panes`` payload.
+
+    Returns:
+        Dict with ``current_path`` (focused pane's path or ``None`` if no
+        NetworkEditor pane is current), ``pane_name`` (focused pane's name),
+        and ``alternates`` (list of other NetworkEditor panes).
+    """
+    bridge = _get_bridge(ctx)
+    return await bridge.execute("viewport.get_current_network_path", {})
+
+
+@mcp.tool()
 async def find_error_nodes(
     ctx: Context,
     root_path: str = "/",

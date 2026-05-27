@@ -47,4 +47,4 @@ If the Houdini MCP tools are unavailable, say so briefly and continue only with 
 
 - Call `log_status` at major milestones.
 - Call `set_current_network` before building in a network.
-- Call `layout_children` every few nodes so the graph stays readable.
+- Preserve existing node positions. Do not call `layout_children` as routine cleanup; only use it when the user explicitly asks for layout/cleanup, or inside a newly created isolated parent network/subnet.

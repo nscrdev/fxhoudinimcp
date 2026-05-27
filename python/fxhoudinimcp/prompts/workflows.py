@@ -129,17 +129,20 @@ def omniverse_prep(
 
 @mcp.prompt()
 def houdini_cleanup(
-    network_path: str,
-    scope: str = "top_level_only",
+    network_path: str = "",
 ) -> str:
-    """Houdini cleanup: rename nodes to descriptive snake_case names for handoff (rename only).
+    """Houdini cleanup: rename direct children of one network (rename only, never recursive).
+
+    The skill always operates on a single level: the direct children of
+    ``network_path``. It never descends into subnets or HDAs. To clean a
+    nested network, re-invoke the skill with that deeper path explicitly.
 
     Args:
-        network_path: Parent network path (e.g. /stage/sopcreate1/sopnet/create or /obj/geo1)
-        scope: top_level_only (default) or include_subnets
+        network_path: Parent network path whose direct children should be
+            renamed (e.g. ``/obj/geo1`` or ``/stage``). If empty, the
+            assistant will list candidate networks and ask the user to pick.
     """
     return load_markdown(
         "houdini_cleanup.md",
-        network_path=network_path,
-        scope=scope,
+        network_path=network_path or "(unspecified — ask the user to pick a network)",
     )

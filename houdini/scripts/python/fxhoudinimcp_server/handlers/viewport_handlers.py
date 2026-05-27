@@ -650,6 +650,55 @@ def set_current_network(network_path: str) -> dict:
     }
 
 
+###### viewport.get_current_network_path
+
+def get_current_network_path() -> dict:
+    """Return the network path the user currently has open in the network editor.
+
+    Reads pane tabs and reports the *current* NetworkEditor pane (the one with
+    ``is_current_tab == True``) plus any other NetworkEditor panes as
+    alternates. Use this in cleanup workflows to disambiguate the user's
+    intended target without parsing the full ``list_panes`` payload.
+
+    Returns:
+        Dict with:
+            current_path: Path of the currently-focused NetworkEditor pane,
+                          or ``None`` if no NetworkEditor pane is current.
+            pane_name:    Pane tab name of the currently-focused NetworkEditor.
+            alternates:   List of {pane_name, current_path, is_current_tab}
+                          for every other NetworkEditor pane in the UI.
+    """
+    current_path: str | None = None
+    current_pane_name: str | None = None
+    alternates: list[dict] = []
+
+    for pt in hou.ui.paneTabs():
+        if pt.type() != hou.paneTabType.NetworkEditor:
+            continue
+        try:
+            pane_path = pt.pwd().path()
+        except (hou.OperationFailed, hou.ObjectWasDeleted, AttributeError) as e:
+            logger.debug("Could not read network editor path for pane '%s': %s", pt.name(), e)
+            continue
+
+        is_current = bool(pt.isCurrentTab())
+        if is_current and current_path is None:
+            current_path = pane_path
+            current_pane_name = pt.name()
+        else:
+            alternates.append({
+                "pane_name": pt.name(),
+                "current_path": pane_path,
+                "is_current_tab": is_current,
+            })
+
+    return {
+        "current_path": current_path,
+        "pane_name": current_pane_name,
+        "alternates": alternates,
+    }
+
+
 ###### viewport.find_error_nodes
 
 def find_error_nodes(root_path: str = "/") -> dict:
@@ -797,5 +846,6 @@ register_handler("viewport.frame_all", frame_all)
 register_handler("viewport.capture_screenshot", capture_screenshot)
 register_handler("viewport.capture_network_editor", capture_network_editor)
 register_handler("viewport.set_current_network", set_current_network)
+register_handler("viewport.get_current_network_path", get_current_network_path)
 register_handler("viewport.find_error_nodes", find_error_nodes)
 register_handler("viewport.log_status", log_status)

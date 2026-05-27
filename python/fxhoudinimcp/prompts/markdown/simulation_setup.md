@@ -45,7 +45,7 @@ Houdini ships workflow tools (setup_pyro_sim, setup_rbd_sim, setup_flip_sim, set
 | Wrangle to set density/temperature | Volume Source DOP + Attribute Create on source geo |
 | Wrangle to move particles | POP Force / POP Wind / POP Attract / POP Curve Force DOP |
 | Manual DOP wiring for common sims | setup_pyro_sim / setup_rbd_sim / setup_flip_sim / setup_vellum_sim tools |
-| Hardcoded solver substeps | Create a CTRL null with spare parm, channel-reference it |
+| Hardcoded solver substeps | Add a spare parm directly on the solver node it controls, then reference it locally |
 
 ## Workflow
 

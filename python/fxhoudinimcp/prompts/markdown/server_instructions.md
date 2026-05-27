@@ -152,6 +152,6 @@ Web sources below are for tutorials, forum threads, and community patterns that 
 
 *   After EVERY create\_wrangle or set\_wrangle\_code, immediately call validate\_vex. Do not proceed until it reports no errors.
 *   build\_sop\_chain wires a whole chain at once. Prefer it over individual create\_node calls for linear SOP chains.
-*   NEVER hardcode tweakable values. Create a controller null ('CTRL') with spare parameters.
-*   Call layout\_children after every batch of nodes, not just at the end.
+*   NEVER hardcode tweakable values. Add spare parameters directly to the node they control. Do not create controller nulls unless the user explicitly asks for one.
+*   Preserve existing network layout. Do not call `layout_children` as routine cleanup. Use it only when the user explicitly requests layout/cleanup, or on a newly created isolated parent network/subnet where it will not move existing user nodes.
 *   When a workflow tool exists (setup\_pyro\_sim, setup\_rbd\_sim, etc.), use it instead of building from scratch.
