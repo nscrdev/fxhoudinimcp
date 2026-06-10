@@ -2,7 +2,7 @@
 
 ## Overview
 
-fxhoudinimcp exposes **167 tools** across **19 categories**, covering every major Houdini context.
+fxhoudinimcp exposes **168 tools** across **19 categories**, covering every major Houdini context.
 
 Once connected, your AI assistant can:
 
@@ -16,9 +16,10 @@ Once connected, your AI assistant can:
 
 ## Categories
 
-### Scene Management (7 tools)
+### Scene Management (8 tools)
 
-Open, save, import/export, and query scene information.
+Open, save, import/export, query scene information, and inspect the Houdini
+connection status.
 
 ### Node Operations (16 tools)
 

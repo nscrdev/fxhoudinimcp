@@ -233,6 +233,12 @@ Or to scope it to a single project, add a `.mcp.json` in the project root:
 
 Launch Houdini normally. The plugin auto-starts once when the UI is ready (controlled by `FXHOUDINIMCP_AUTOSTART` env var). The startup script uses `uiready.py`, which stacks correctly with other Houdini packages. You can also toggle it manually via the **MCP Server** shelf tool.
 
+Startup verifies that Houdini's `mcp.health` endpoint answers from the current
+Houdini process before printing that the server is ready. If your assistant
+cannot reach Houdini after an app restart, call `get_houdini_connection_status`
+for structured diagnostics, then relaunch Houdini or align `FXHOUDINIMCP_PORT`
+and `HOUDINI_PORT` if another process owns the port.
+
 Once connected, your AI assistant can:
 
 ```
@@ -273,7 +279,7 @@ pytest
 
 1. **Houdini Plugin** (`houdini/`): Runs inside Houdini's Python environment. Registers `@hwebserver.apiFunction` endpoints that receive JSON commands. Uses `hdefereval.executeInMainThreadWithResult()` to safely execute `hou.*` calls on the main thread.
 
-2. **MCP Server** (`python/fxhoudinimcp/`): A standalone Python process using FastMCP. Exposes 167 tools, 8 resources, and 6 prompts via the MCP protocol. Forwards tool calls to Houdini over HTTP.
+2. **MCP Server** (`python/fxhoudinimcp/`): A standalone Python process using FastMCP. Exposes 168 tools, 8 resources, and 6 prompts via the MCP protocol. Forwards tool calls to Houdini over HTTP.
 
 3. **Bridge** (`python/fxhoudinimcp/bridge.py`): Async HTTP client that sends commands to Houdini's hwebserver and deserializes responses. Handles connection errors and timeouts.
 

@@ -13,7 +13,42 @@ from typing import Optional
 from mcp.server.fastmcp import Context
 
 # Internal
+from fxhoudinimcp.errors import ConnectionError as HoudiniConnectionError
 from fxhoudinimcp.server import mcp, _get_bridge
+
+
+@mcp.tool()
+async def get_houdini_connection_status(ctx: Context) -> dict:
+    """Check the Codex-to-Houdini bridge without raising on disconnect.
+
+    Returns structured connection diagnostics, including the configured bridge
+    URL and Houdini health payload when reachable. Use this before live viewport
+    workflows when Houdini may have restarted or its hwebserver may not be
+    running.
+    """
+    bridge = _get_bridge(ctx)
+    try:
+        health = await bridge.health_check()
+    except HoudiniConnectionError as exc:
+        return {
+            "connected": False,
+            "base_url": bridge.base_url,
+            "error": str(exc),
+            "details": exc.details,
+        }
+    except Exception as exc:
+        return {
+            "connected": False,
+            "base_url": bridge.base_url,
+            "error": str(exc),
+            "details": {"type": type(exc).__name__},
+        }
+
+    return {
+        "connected": True,
+        "base_url": bridge.base_url,
+        "health": health,
+    }
 
 
 @mcp.tool()

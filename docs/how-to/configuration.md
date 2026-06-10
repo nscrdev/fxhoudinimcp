@@ -13,13 +13,22 @@
 
 ## Auto-Start
 
-The Houdini plugin auto-starts on scene load via `scripts/456.py`. Disable this by setting:
+The Houdini plugin auto-starts when the UI is ready via `uiready.py`, which
+stacks cleanly with other Houdini packages. Startup registers the MCP endpoints,
+starts Houdini's `hwebserver` when needed, and verifies that `mcp.health`
+answers from the current Houdini process before reporting readiness. Disable
+auto-start by setting:
 
 ``` shell
 export FXHOUDINIMCP_AUTOSTART=0
 ```
 
 You can still toggle the server manually using the **MCP Server** shelf tool.
+
+If an assistant cannot reach Houdini, use `get_houdini_connection_status` to
+return structured diagnostics without raising a tool error. If port `8100` is
+owned by a different Houdini process, either close that process or set both
+`FXHOUDINIMCP_PORT` and `HOUDINI_PORT` to a matching free port.
 
 ## Transport Modes
 
