@@ -106,19 +106,49 @@ def _downscale_and_encode(file_path: str) -> tuple[str | None, str]:
 
 
 def _capture_pane_tab_qt(pane_tab, output_path: str) -> None:
-    """Capture a pane tab screenshot using its Qt widget."""
-    try:
-        widget = pane_tab.qtParentWidget()
-    except AttributeError:
-        widget = None
+    """Capture a pane tab screenshot via Qt.
 
-    if widget is None:
-        raise RuntimeError(
-            f"Cannot capture pane '{pane_tab.name()}': "
-            f"qtParentWidget() not available for this Houdini version."
+    Houdini 20.x exposed PaneTab.qtParentWidget(); Houdini 21 removed it
+    in favor of qtParentWindow()/qtScreenGeometry(), so fall back to
+    grabbing the pane's screen region.
+    """
+    pixmap = None
+
+    if hasattr(pane_tab, "qtParentWidget"):
+        try:
+            widget = pane_tab.qtParentWidget()
+        except Exception:
+            widget = None
+        if widget is not None:
+            pixmap = widget.grab()
+
+    if pixmap is None and hasattr(pane_tab, "qtScreenGeometry"):
+        rect = pane_tab.qtScreenGeometry()
+        try:
+            from PySide6 import QtGui
+        except ImportError:
+            from PySide2 import QtGui
+        screens = QtGui.QGuiApplication.screens()
+        screen = QtGui.QGuiApplication.primaryScreen()
+        for candidate in screens:
+            if candidate.geometry().contains(rect.center()):
+                screen = candidate
+                break
+        geometry = screen.geometry()
+        pixmap = screen.grabWindow(
+            0,
+            rect.x() - geometry.x(),
+            rect.y() - geometry.y(),
+            rect.width(),
+            rect.height(),
         )
 
-    pixmap = widget.grab()
+    if pixmap is None:
+        raise RuntimeError(
+            f"Cannot capture pane '{pane_tab.name()}': no Qt capture API "
+            f"available in this Houdini build."
+        )
+
     if not pixmap.save(output_path):
         raise RuntimeError(
             f"Failed to save screenshot to '{output_path}'. "
