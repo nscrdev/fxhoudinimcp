@@ -109,15 +109,30 @@ class TestSimSetups:
         for path in data["all_nodes"]:
             assert hou.node(path) is not None, f"claimed node missing: {path}"
 
-    def test_setup_rbd_sim_claimed_nodes_exist(self, call):
+    def test_setup_rbd_sim_actually_simulates(self, call):
         geo = call(
             "nodes.create_node", parent_path="/obj", node_type="geo", name="geo1"
         )["node_path"]
-        call("nodes.create_node", parent_path=geo, node_type="box")
+        box = call("nodes.create_node", parent_path=geo, node_type="box")["node_path"]
+        call("parameters.set_parameter", node_path=box, parm_name="ty", value=3.0)
         data = call("workflow.setup_rbd_sim", geo_path=geo)
         assert data["success"] is True
         for path in data["all_nodes"]:
             assert hou.node(path) is not None, f"claimed node missing: {path}"
+
+        # The sim must actually move geometry — a network that looks right
+        # but cooks empty (the original voronoifracture had no cell-point
+        # input) passes existence checks while fooling the user.
+        display = hou.node(data["geo_path"]).displayNode()
+        hou.setFrame(1)
+        start_geo = display.geometry()
+        assert start_geo is not None and not display.errors(), display.errors()
+        start_y = start_geo.boundingBox().center()[1]
+        hou.setFrame(12)
+        end_y = display.geometry().boundingBox().center()[1]
+        assert end_y < start_y - 0.3, (
+            f"RBD pieces did not fall: y {start_y:.2f} -> {end_y:.2f}"
+        )
 
 
 class TestSetupRender:

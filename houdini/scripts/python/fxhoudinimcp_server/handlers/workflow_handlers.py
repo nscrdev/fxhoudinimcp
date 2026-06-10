@@ -387,79 +387,93 @@ def _setup_rbd_sim(
     all_nodes.append(objmerge.path())
     last_sop = objmerge
 
-    # -- Step 3: Optional Voronoi Fracture
+    # -- Step 3: Optional fracture. rbdmaterialfracture is the modern
+    # one-input choice whose outputs (geometry/constraints/proxy) feed the
+    # Bullet solver directly. Plain voronoifracture REQUIRES cell points
+    # on its second input — wiring it alone leaves an uncookable network.
+    fracture = None
     if pieces_type == "voronoi":
-        print("[workflow] Creating Voronoi Fracture SOP")
         try:
+            print("[workflow] Creating RBD Material Fracture SOP")
+            fracture = geo.createNode("rbdmaterialfracture", "fracture1")
+            fracture.setInput(0, last_sop, 0)
+            all_nodes.append(fracture.path())
+            last_sop = fracture
+        except hou.OperationFailed:
+            print("[workflow] rbdmaterialfracture unavailable, using scatter + voronoifracture")
+            scatter = geo.createNode("scatter", "cell_points")
+            scatter.setInput(0, last_sop, 0)
+            _set_parm_safe(scatter, "npts", 30)
             voronoi = geo.createNode("voronoifracture", "voronoi_fracture1")
             voronoi.setInput(0, last_sop, 0)
-            all_nodes.append(voronoi.path())
+            voronoi.setInput(1, scatter, 0)
+            all_nodes.extend([scatter.path(), voronoi.path()])
             last_sop = voronoi
-        except hou.OperationFailed:
-            print("[workflow] Warning: voronoifracture not available, trying boolean fracture")
-            try:
-                voronoi = geo.createNode("boolean::2.0", "fracture1")
-                voronoi.setInput(0, last_sop, 0)
-                all_nodes.append(voronoi.path())
-                last_sop = voronoi
-            except hou.OperationFailed:
-                print("[workflow] Warning: fracture node not available, skipping fracture step")
 
-    # -- Step 4: Create DOP Network
-    print("[workflow] Creating DOP Network")
-    dopnet = geo.createNode("dopnet", "dopnet1")
-    all_nodes.append(dopnet.path())
-
-    # -- Step 5: Create RBD solver inside DOPnet
-    print("[workflow] Creating RBD Bullet Solver DOP")
+    # -- Step 4: Solver. Prefer the SOP-level Bullet solver (Houdini
+    # 18.5+): it simulates its input directly, applies gravity, and has a
+    # built-in ground plane — no DOP wiring to get wrong.
+    solver_path = None
     try:
-        rbdsolver = dopnet.createNode("rbdbulletsolver", "rbdsolver1")
+        solver = geo.createNode("rbdbulletsolver", "rbd_solver1")
     except hou.OperationFailed:
-        try:
-            rbdsolver = dopnet.createNode("rbdsolver", "rbdsolver1")
-        except hou.OperationFailed:
-            rbdsolver = dopnet.createNode("bulletrbdsolver", "rbdsolver1")
-    all_nodes.append(rbdsolver.path())
+        solver = None
 
-    # -- Step 6: Create RBD packed object
-    print("[workflow] Creating RBD Packed Object DOP")
-    try:
+    if solver is not None:
+        print("[workflow] Creating SOP-level RBD Bullet Solver")
+        solver.setInput(0, last_sop, 0)
+        if fracture is not None and fracture.type().name().startswith(
+            "rbdmaterialfracture"
+        ):
+            # Outputs line up 1:1 with the solver's first three inputs.
+            solver.setInput(1, fracture, 1)
+            solver.setInput(2, fracture, 2)
+        _set_parm_safe(solver, "useground", 1 if ground else 0)
+        all_nodes.append(solver.path())
+        solver_path = solver.path()
+        last_sop = solver
+    else:
+        # Legacy DOP fallback: the packed object must point at the SOP
+        # geometry, and object + ground must merge into the solver chain.
+        print("[workflow] Creating DOP Network (SOP solver unavailable)")
+        dopnet = geo.createNode("dopnet", "dopnet1")
+        all_nodes.append(dopnet.path())
+        solver_path = dopnet.path()
+
         rbdobj = dopnet.createNode("rbdpackedobject", "rbdobject1")
+        for parm_name in ("soppath", "sop_path"):
+            if _set_parm_safe(rbdobj, parm_name, last_sop.path()):
+                break
         all_nodes.append(rbdobj.path())
-        rbdsolver.setInput(0, rbdobj, 0)
-    except hou.OperationFailed:
-        print("[workflow] Warning: rbdpackedobject not available")
-        rbdobj = None
 
-    # -- Step 7: Ground plane
-    if ground:
-        print("[workflow] Creating Ground Plane DOP")
-        try:
+        rbdsolver = dopnet.createNode("rbdsolver", "rbdsolver1")
+        all_nodes.append(rbdsolver.path())
+
+        merge_dop = dopnet.createNode("merge", "merge1")
+        merge_dop.setInput(0, rbdobj, 0)
+        if ground:
             groundplane = dopnet.createNode("groundplane", "groundplane1")
+            merge_dop.setInput(1, groundplane, 0)
             all_nodes.append(groundplane.path())
-        except hou.OperationFailed:
-            print("[workflow] Warning: groundplane DOP not available, creating static ground in SOPs")
-            try:
-                ground_sop = geo.createNode("grid", "ground_plane")
-                _set_parm_safe(ground_sop, "sizex", 20.0)
-                _set_parm_safe(ground_sop, "sizey", 20.0)
-                all_nodes.append(ground_sop.path())
-            except Exception as e:
-                print(f"[workflow] Warning: could not create ground: {e}")
+        rbdsolver.setInput(0, merge_dop, 0)
+        gravity = dopnet.createNode("gravity", "gravity1")
+        gravity.setInput(0, rbdsolver, 0)
+        gravity.setDisplayFlag(True)
+        all_nodes.append(gravity.path())
 
-    # -- Step 8: DOP Import
-    print("[workflow] Creating DOP Import SOP")
-    dopimport = geo.createNode("dopimport", "dop_import1")
-    _set_parm_safe(dopimport, "doppath", dopnet.path())
-    all_nodes.append(dopimport.path())
+        dopimport = geo.createNode("dopimport", "dop_import1")
+        _set_parm_safe(dopimport, "doppath", dopnet.path())
+        dopimport.setInput(0, last_sop, 0)
+        all_nodes.append(dopimport.path())
+        last_sop = dopimport
 
-    # -- Step 9: File Cache
+    # -- Step 5: File Cache
     print("[workflow] Creating File Cache SOP")
     try:
         filecache = geo.createNode("filecache", "file_cache1")
     except hou.OperationFailed:
         filecache = geo.createNode("filecache::2.0", "file_cache1")
-    filecache.setInput(0, dopimport, 0)
+    filecache.setInput(0, last_sop, 0)
     all_nodes.append(filecache.path())
 
     try:
@@ -468,10 +482,9 @@ def _setup_rbd_sim(
     except Exception:
         pass
 
-    # -- Step 10: Layout
+    # -- Step 6: Layout
     print("[workflow] Laying out nodes")
     layout_if_enabled(geo)
-    layout_if_enabled(dopnet)
     _focus_network_editor(filecache)
 
     print(f"[workflow] RBD simulation '{name}' setup complete")
@@ -479,7 +492,7 @@ def _setup_rbd_sim(
     return {
         "success": True,
         "geo_path": geo.path(),
-        "dop_path": dopnet.path(),
+        "solver_path": solver_path,
         "cache_path": filecache.path(),
         "all_nodes": all_nodes,
     }
