@@ -39,6 +39,7 @@ def result_with_image(result: dict) -> list[TextContent | ImageContent]:
 from fxhoudinimcp.tools import scene  # noqa: F401
 from fxhoudinimcp.tools import nodes  # noqa: F401
 from fxhoudinimcp.tools import graph  # noqa: F401
+from fxhoudinimcp.tools import help  # noqa: F401
 from fxhoudinimcp.tools import parameters  # noqa: F401
 from fxhoudinimcp.tools import code  # noqa: F401
 from fxhoudinimcp.tools import dops  # noqa: F401

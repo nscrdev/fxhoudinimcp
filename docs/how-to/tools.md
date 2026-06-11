@@ -2,7 +2,7 @@
 
 ## Overview
 
-fxhoudinimcp exposes **177 tools** across **21 categories**, covering every major Houdini context.
+fxhoudinimcp exposes **179 tools** across **22 categories**, covering every major Houdini context.
 
 Once connected, your AI assistant can:
 
@@ -23,6 +23,15 @@ atomically (with dry-run plan checking), `verify_network` inspects every
 node's errors and cooked geometry, `get_node_card` serves version-exact
 node documentation from the running Houdini, and `find_expensive_nodes`
 profiles cook costs.
+
+### Documentation (2 tools)
+
+`search_help` runs full-text search over the documentation Houdini
+ships in `$HFS/houdini/help` (nodes, VEX, expressions, HOM, Solaris,
+TOPs, character, reference) — always version-exact, no network needed.
+`get_help_page` fetches a full page. On builds without local help, both
+degrade into a clear error pointing at `get_node_card` and the online
+docs.
 
 ### Scene Management (7 tools)
 

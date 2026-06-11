@@ -19,6 +19,7 @@ _HANDLER_MODULES = [
     "scene_handlers",
     "node_handlers",
     "graph_handlers",
+    "help_handlers",
     "parameter_handlers",
     "code_handlers",
     "dop_handlers",
