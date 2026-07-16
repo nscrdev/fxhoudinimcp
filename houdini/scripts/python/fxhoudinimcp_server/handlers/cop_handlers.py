@@ -13,6 +13,7 @@ import logging
 import hou
 
 # Internal
+from fxhoudinimcp_server.config import layout_if_enabled
 from fxhoudinimcp_server.dispatcher import register_handler
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ def _focus_network_editor(node: hou.Node) -> None:
     try:
         parent = node.parent()
         if parent is not None:
-            parent.layoutChildren()
+            layout_if_enabled(parent)
         for pane_tab in hou.ui.paneTabs():
             if pane_tab.type() == hou.paneTabType.NetworkEditor:
                 if parent is not None:
@@ -351,12 +352,13 @@ def list_cop_node_types(filter: str = None) -> dict:
     Args:
         filter: Optional substring filter for node type names.
     """
-    # Try Cop2 category (standard COPs and Copernicus)
+    # Copernicus ("Cop", Houdini 20.5+) is what create_cop_node creates
+    # inside a copnet; fall back to legacy Cop2 on older builds.
     cop_types = []
 
     try:
-        cop2_category = hou.cop2NodeTypeCategory()
-        for type_name, node_type in cop2_category.nodeTypes().items():
+        category = hou.nodeTypeCategories().get("Cop") or hou.cop2NodeTypeCategory()
+        for type_name, node_type in category.nodeTypes().items():
             if filter and filter.lower() not in type_name.lower():
                 continue
             type_info = {

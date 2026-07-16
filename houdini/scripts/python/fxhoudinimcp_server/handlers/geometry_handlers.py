@@ -89,26 +89,25 @@ def _get_geometry_info(*, node_path: str) -> dict[str, Any]:
     ]:
         attribs[label] = [_attrib_meta(a) for a in getter()]
 
-    # Prim type breakdown — capped at 10 000 prims to avoid slow Python loops
-    # on large meshes. Sampled proportionally when over the limit.
-    all_prims = geo.prims()
-    _PRIM_SAMPLE_LIMIT = 10_000
+    # Prim type breakdown — indexed access via geo.prim() so large meshes
+    # never materialize the full prim tuple. Sampled when over the limit.
+    total_prims = geo.intrinsicValue("primitivecount")
+    _PRIM_SAMPLE_LIMIT = 2_500
     prim_types: dict[str, int] = {}
     prim_sample_note: str | None = None
-    if len(all_prims) <= _PRIM_SAMPLE_LIMIT:
-        for prim in all_prims:
-            t = prim.type().name()
+    if total_prims <= _PRIM_SAMPLE_LIMIT:
+        for i in range(total_prims):
+            t = geo.prim(i).type().name()
             prim_types[t] = prim_types.get(t, 0) + 1
     else:
-        step = len(all_prims) / _PRIM_SAMPLE_LIMIT
+        step = total_prims / _PRIM_SAMPLE_LIMIT
         for i in range(_PRIM_SAMPLE_LIMIT):
-            prim = all_prims[int(i * step)]
-            t = prim.type().name()
+            t = geo.prim(int(i * step)).type().name()
             prim_types[t] = prim_types.get(t, 0) + 1
         # Scale counts back up to approximate totals
-        scale = len(all_prims) / _PRIM_SAMPLE_LIMIT
+        scale = total_prims / _PRIM_SAMPLE_LIMIT
         prim_types = {k: int(v * scale) for k, v in prim_types.items()}
-        prim_sample_note = f"sampled {_PRIM_SAMPLE_LIMIT}/{len(all_prims)} prims"
+        prim_sample_note = f"sampled {_PRIM_SAMPLE_LIMIT}/{total_prims} prims"
 
     bbox = geo.boundingBox()
 
@@ -143,7 +142,11 @@ def _get_points(
     count: int = 1000,
     group: str | None = None,
 ) -> dict[str, Any]:
-    """Read point positions and attributes with pagination."""
+    """Read point positions and attributes with pagination.
+
+    Uses indexed access (geo.point) so the cost scales with the page
+    size, never with the total point count.
+    """
     geo = _get_sop_geo(node_path)
 
     if attributes is None:
@@ -154,23 +157,25 @@ def _get_points(
         if pt_group is None:
             raise hou.OperationFailed(f"Point group not found: {group}")
         points = pt_group.points()
+        total = len(points)
+        end = min(start + count, total)
+        page = points[start:end]
     else:
-        points = geo.points()
+        total = geo.intrinsicValue("pointcount")
+        end = min(start + count, total)
+        page = [geo.point(i) for i in range(max(start, 0), end)]
 
-    total = len(points)
-    end = min(start + count, total)
-    page = points[start:end]
+    found = {name: geo.findPointAttrib(name) is not None for name in attributes}
 
     rows: list[dict[str, Any]] = []
     for pt in page:
         row: dict[str, Any] = {"index": pt.number()}
         for attr_name in attributes:
-            attrib = geo.findPointAttrib(attr_name)
-            if attrib is None:
-                row[attr_name] = None
-                continue
-            val = pt.attribValue(attr_name)
-            row[attr_name] = _vec_to_list(val)
+            row[attr_name] = (
+                _vec_to_list(pt.attribValue(attr_name))
+                if found[attr_name]
+                else None
+            )
         rows.append(row)
 
     return {
@@ -203,12 +208,14 @@ def _get_prims(
         if pr_group is None:
             raise hou.OperationFailed(f"Prim group not found: {group}")
         prims = pr_group.prims()
+        total = len(prims)
+        end = min(start + count, total)
+        page = prims[start:end]
     else:
-        prims = geo.prims()
-
-    total = len(prims)
-    end = min(start + count, total)
-    page = prims[start:end]
+        # Indexed access keeps the cost proportional to the page size.
+        total = geo.intrinsicValue("primitivecount")
+        end = min(start + count, total)
+        page = [geo.prim(i) for i in range(max(start, 0), end)]
 
     # If no attributes specified, gather all prim attribute names
     if attributes is None:
@@ -333,43 +340,57 @@ def _set_detail_attrib(
     attrib_name: str,
     value: Any,
 ) -> dict[str, Any]:
-    """Set a detail (global) attribute on a SOP node's geometry."""
+    """Set a detail (global) attribute via an appended Attribute Create SOP.
+
+    SOP geometry cannot be edited in place from outside a node cook
+    (hou.SopNode has no setGeometry), so this wires an attribcreate node
+    after *node_path* and moves the display/render flags to it.
+    """
     node = hou.node(node_path)
     if node is None:
         raise hou.OperationFailed(f"Node not found: {node_path}")
-
-    geo = node.geometry()
-    if geo is None:
+    if node.geometry() is None:
         raise hou.OperationFailed(f"Node has no geometry: {node_path}")
 
-    with geo.freeze() as frozen_geo:
-        # Determine attribute type from value
-        if isinstance(value, float):
-            if frozen_geo.findGlobalAttrib(attrib_name) is None:
-                frozen_geo.addAttrib(hou.attribType.Global, attrib_name, 0.0)
-            frozen_geo.setGlobalAttribValue(attrib_name, value)
-        elif isinstance(value, int):
-            if frozen_geo.findGlobalAttrib(attrib_name) is None:
-                frozen_geo.addAttrib(hou.attribType.Global, attrib_name, 0)
-            frozen_geo.setGlobalAttribValue(attrib_name, value)
-        elif isinstance(value, str):
-            if frozen_geo.findGlobalAttrib(attrib_name) is None:
-                frozen_geo.addAttrib(hou.attribType.Global, attrib_name, "")
-            frozen_geo.setGlobalAttribValue(attrib_name, value)
-        elif isinstance(value, (list, tuple)):
-            default = [0.0] * len(value)
-            if frozen_geo.findGlobalAttrib(attrib_name) is None:
-                frozen_geo.addAttrib(hou.attribType.Global, attrib_name, default)
-            frozen_geo.setGlobalAttribValue(attrib_name, value)
-        else:
-            raise ValueError(f"Unsupported value type: {type(value).__name__}")
+    attrib_node = node.parent().createNode("attribcreate", f"set_{attrib_name}")
+    attrib_node.setInput(0, node)
+    attrib_node.parm("numattr").set(1)
+    attrib_node.parm("class1").set("detail")
+    attrib_node.parm("name1").set(attrib_name)
 
-        node.setGeometry(frozen_geo)
+    if isinstance(value, str):
+        attrib_node.parm("type1").set("index")
+        attrib_node.parm("string1").set(value)
+    elif isinstance(value, bool):
+        attrib_node.parm("type1").set("int")
+        attrib_node.parm("value1v1").set(int(value))
+    elif isinstance(value, int):
+        attrib_node.parm("type1").set("int")
+        attrib_node.parm("value1v1").set(value)
+    elif isinstance(value, float):
+        attrib_node.parm("type1").set("float")
+        attrib_node.parm("value1v1").set(value)
+    elif isinstance(value, (list, tuple)) and 1 <= len(value) <= 4:
+        attrib_node.parm("type1").set("float")
+        attrib_node.parm("size1").set(len(value))
+        for index, component in enumerate(value):
+            attrib_node.parm(f"value1v{index + 1}").set(float(component))
+    else:
+        attrib_node.destroy()
+        raise ValueError(f"Unsupported value type: {type(value).__name__}")
+
+    attrib_node.setDisplayFlag(True)
+    attrib_node.setRenderFlag(True)
+
+    # Read the value back from the cooked geometry so the result reports
+    # what actually happened rather than what was requested.
+    applied = attrib_node.geometry().attribValue(attrib_name)
 
     return {
         "node_path": node_path,
+        "attrib_node_path": attrib_node.path(),
         "attrib_name": attrib_name,
-        "value": _vec_to_list(value),
+        "value": _vec_to_list(applied),
         "success": True,
     }
 
@@ -544,8 +565,7 @@ def _sample_geometry(
     """Smart sampling: get N evenly distributed points from geometry."""
     geo = _get_sop_geo(node_path)
 
-    points = geo.points()
-    total = len(points)
+    total = geo.intrinsicValue("pointcount")
 
     if total == 0:
         return {
@@ -571,12 +591,12 @@ def _sample_geometry(
             for i in range(actual_count)
         ))
 
-    # Gather attributes
+    # Gather attributes — indexed access keeps the cost O(sample_count)
     point_attrib_names = [a.name() for a in geo.pointAttribs()]
 
     rows: list[dict[str, Any]] = []
     for idx in sampled_indices:
-        pt = points[idx]
+        pt = geo.point(idx)
         row: dict[str, Any] = {"index": pt.number()}
         for attr_name in point_attrib_names:
             val = pt.attribValue(attr_name)
@@ -608,14 +628,14 @@ def _get_prim_intrinsics(
     Otherwise return intrinsics for the specified primitive.
     """
     geo = _get_sop_geo(node_path)
+    total_prims = geo.intrinsicValue("primitivecount")
 
     if prim_index is not None:
-        prims = geo.prims()
-        if prim_index < 0 or prim_index >= len(prims):
+        if prim_index < 0 or prim_index >= total_prims:
             raise hou.OperationFailed(
                 f"Prim index {prim_index} out of range "
-                f"(0..{len(prims) - 1}) on {node_path}")
-        prim = prims[prim_index]
+                f"(0..{total_prims - 1}) on {node_path}")
+        prim = geo.prim(prim_index)
         intrinsic_names = prim.intrinsicNames()
         intrinsics: dict[str, Any] = {}
         for name in intrinsic_names:
@@ -629,17 +649,30 @@ def _get_prim_intrinsics(
             "intrinsics": intrinsics,
         }
 
-    # Summary mode: aggregate intrinsics across all prims
-    prims = geo.prims()
-    if len(prims) == 0:
+    # Summary mode: aggregate intrinsics across (a sample of) the prims.
+    # Reading every intrinsic of every prim is O(names * prims) HOM calls
+    # — 14+ seconds on a 250k-prim mesh — so cap the statistics sample.
+    if total_prims == 0:
         return {
             "node_path": node_path,
             "total_prims": 0,
             "summary": {},
         }
 
-    # Use first prim to discover intrinsic names
-    sample_prim = prims[0]
+    _SUMMARY_SAMPLE_LIMIT = 1_000
+    if total_prims <= _SUMMARY_SAMPLE_LIMIT:
+        sample_prims = [geo.prim(i) for i in range(total_prims)]
+        sample_note = None
+    else:
+        step = total_prims / _SUMMARY_SAMPLE_LIMIT
+        sample_prims = [
+            geo.prim(int(i * step)) for i in range(_SUMMARY_SAMPLE_LIMIT)
+        ]
+        sample_note = (
+            f"statistics sampled from {_SUMMARY_SAMPLE_LIMIT}/{total_prims} prims"
+        )
+
+    sample_prim = sample_prims[0]
     intrinsic_names = sample_prim.intrinsicNames()
 
     summary: dict[str, Any] = {}
@@ -648,7 +681,7 @@ def _get_prim_intrinsics(
             first_val = sample_prim.intrinsicValue(name)
             if isinstance(first_val, (int, float)):
                 # Compute min/max/avg for numeric intrinsics
-                vals = [p.intrinsicValue(name) for p in prims]
+                vals = [p.intrinsicValue(name) for p in sample_prims]
                 summary[name] = {
                     "min": min(vals),
                     "max": max(vals),
@@ -658,7 +691,7 @@ def _get_prim_intrinsics(
             elif isinstance(first_val, str):
                 # Collect unique string values
                 unique = set()
-                for p in prims:
+                for p in sample_prims:
                     unique.add(p.intrinsicValue(name))
                     if len(unique) > 20:
                         break
@@ -673,12 +706,15 @@ def _get_prim_intrinsics(
         except Exception:
             summary[name] = {"sample": None, "error": "Could not read"}
 
-    return {
+    result = {
         "node_path": node_path,
-        "total_prims": len(prims),
+        "total_prims": total_prims,
         "intrinsic_names": list(intrinsic_names),
         "summary": summary,
     }
+    if sample_note:
+        result["summary_note"] = sample_note
+    return result
 
 register_handler("geometry.get_prim_intrinsics", _get_prim_intrinsics)
 
@@ -697,32 +733,44 @@ def _find_nearest_point(
     if len(position) != 3:
         raise ValueError("position must be a list of 3 floats [x, y, z]")
 
-    pos = hou.Vector3(position)
-
-    points = geo.points()
-    if len(points) == 0:
+    total = geo.intrinsicValue("pointcount")
+    if total == 0:
         return {
             "node_path": node_path,
             "position": position,
             "results": [],
         }
 
-    # Compute distances and sort
-    distances: list[tuple[float, int]] = []
-    for pt in points:
-        pt_pos = pt.position()
-        dist = (pt_pos - pos).length()
-        distances.append((dist, pt.number()))
+    k = max(max_results, 1)
+    flat = geo.pointFloatAttribValues("P")
 
-    distances.sort(key=lambda x: x[0])
-    top = distances[:max(max_results, 1)]
+    try:
+        import numpy as np
+
+        coords = np.array(flat, dtype=np.float64).reshape(-1, 3)
+        squared = ((coords - np.array(position)) ** 2).sum(axis=1)
+        if k >= len(squared):
+            top_indices = np.argsort(squared)
+        else:
+            top_indices = np.argpartition(squared, k)[:k]
+            top_indices = top_indices[np.argsort(squared[top_indices])]
+        top = [(float(squared[i]) ** 0.5, int(i)) for i in top_indices[:k]]
+    except ImportError:
+        px, py, pz = position
+        distances: list[tuple[float, int]] = []
+        for i in range(total):
+            dx = flat[i * 3] - px
+            dy = flat[i * 3 + 1] - py
+            dz = flat[i * 3 + 2] - pz
+            distances.append((dx * dx + dy * dy + dz * dz, i))
+        distances.sort(key=lambda x: x[0])
+        top = [(d**0.5, i) for d, i in distances[:k]]
 
     results: list[dict[str, Any]] = []
     for dist, idx in top:
-        pt = points[idx]
         results.append({
             "index": idx,
-            "position": list(pt.position()),
+            "position": list(flat[idx * 3 : idx * 3 + 3]),
             "distance": dist,
         })
 

@@ -13,6 +13,7 @@ import re
 import hou
 
 # Internal
+from fxhoudinimcp_server.config import layout_if_enabled
 from fxhoudinimcp_server.dispatcher import register_handler
 
 
@@ -103,7 +104,7 @@ def _focus_network_editor(node: hou.Node) -> None:
     try:
         parent = node.parent()
         if parent is not None:
-            parent.layoutChildren()
+            layout_if_enabled(parent)
         for pane_tab in hou.ui.paneTabs():
             if pane_tab.type() == hou.paneTabType.NetworkEditor:
                 if parent is not None:

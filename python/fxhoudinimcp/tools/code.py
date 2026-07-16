@@ -21,12 +21,15 @@ from fxhoudinimcp.server import mcp, _get_bridge
 
 @mcp.tool()
 async def execute_python(
-    ctx: Context, code: str, return_expression: str | None = None
+    ctx: Context,
+    code: str,
+    justification: str,
+    return_expression: str | None = None,
 ) -> dict:
     """Execute arbitrary Python code inside Houdini. LAST RESORT only.
 
     DO NOT use this to:
-    - Create nodes → use create_node or build_sop_chain
+    - Create nodes or networks → use build_network or create_node
     - Set parameters → use set_parameter or set_parameters
     - Create wrangles or write Python SOPs → use create_wrangle
     - Connect nodes → use connect_nodes or connect_nodes_batch
@@ -34,18 +37,23 @@ async def execute_python(
 
     ONLY use this when no dedicated tool exists for the operation — i.e.
     hou.* API calls or Python-level state that no other tool exposes.
-    If a dedicated tool exists for the operation, always use it instead,
-    even if execute_python could also accomplish it.
+    The justification parameter is mandatory: name the dedicated tools
+    you considered and why none covers this operation.
 
     Args:
         code: Python source code to execute.
+        justification: Which dedicated tools you considered and why none
+            covers this operation.
         return_expression: Python expression to evaluate after execution.
     """
     bridge = _get_bridge(ctx)
     payload: dict[str, Any] = {"code": code}
     if return_expression is not None:
         payload["return_expression"] = return_expression
-    return await bridge.execute("code.execute_python", payload)
+    result = await bridge.execute("code.execute_python", payload)
+    if isinstance(result, dict):
+        result["justification"] = justification
+    return result
 
 
 ###### code.execute_hscript

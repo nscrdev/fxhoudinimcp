@@ -6,10 +6,15 @@ from __future__ import annotations
 import pytest
 
 # Internal
+from fxhoudinimcp.errors import ConnectionError as HoudiniConnectionError
 from fxhoudinimcp.tools.code import execute_python
 from fxhoudinimcp.tools.materials import list_materials
 from fxhoudinimcp.tools.nodes import create_node
-from fxhoudinimcp.tools.scene import get_scene_info, new_scene
+from fxhoudinimcp.tools.scene import (
+    get_houdini_connection_status,
+    get_scene_info,
+    new_scene,
+)
 from fxhoudinimcp.tools.workflows import setup_pyro_sim
 
 
@@ -26,6 +31,29 @@ class TestSceneTools:
         mock_bridge.execute.return_value = {"created": True}
         result = await new_scene(mock_ctx, save_current=True)
         mock_bridge.execute.assert_called_once_with("scene.new_scene", {"save_current": True})
+
+    @pytest.mark.asyncio
+    async def test_connection_status_success(self, mock_ctx, mock_bridge):
+        mock_bridge.base_url = "http://localhost:8100"
+        mock_bridge.health_check.return_value = {"status": "ok", "pid": 123}
+        result = await get_houdini_connection_status(mock_ctx)
+        assert result == {
+            "connected": True,
+            "base_url": "http://localhost:8100",
+            "health": {"status": "ok", "pid": 123},
+        }
+
+    @pytest.mark.asyncio
+    async def test_connection_status_disconnect(self, mock_ctx, mock_bridge):
+        mock_bridge.base_url = "http://localhost:8100"
+        mock_bridge.health_check.side_effect = HoudiniConnectionError(
+            "Cannot connect",
+            details={"url": "http://localhost:8100"},
+        )
+        result = await get_houdini_connection_status(mock_ctx)
+        assert result["connected"] is False
+        assert result["base_url"] == "http://localhost:8100"
+        assert result["details"] == {"url": "http://localhost:8100"}
 
 
 class TestNodeTools:
@@ -56,19 +84,42 @@ class TestNodeTools:
 class TestCodeTools:
     @pytest.mark.asyncio
     async def test_execute_python_code_only(self, mock_ctx, mock_bridge):
-        await execute_python(mock_ctx, code="print('hi')")
+        result = await execute_python(
+            mock_ctx,
+            code="print('hi')",
+            justification="no dedicated tool prints to the console",
+        )
         mock_bridge.execute.assert_called_once_with(
             "code.execute_python",
             {"code": "print('hi')"},
         )
+        # The justification is echoed back, never forwarded to Houdini.
+        assert result["justification"]
 
     @pytest.mark.asyncio
     async def test_execute_python_with_return(self, mock_ctx, mock_bridge):
-        await execute_python(mock_ctx, code="x = 1 + 1", return_expression="x")
+        await execute_python(
+            mock_ctx,
+            code="x = 1 + 1",
+            justification="no dedicated tool evaluates arbitrary Python",
+            return_expression="x",
+        )
         mock_bridge.execute.assert_called_once_with(
             "code.execute_python",
             {"code": "x = 1 + 1", "return_expression": "x"},
         )
+
+    @pytest.mark.asyncio
+    async def test_justification_required_in_schemas(self):
+        """The schema must force clients to articulate why VEX/Python."""
+        from fxhoudinimcp.server import mcp
+
+        tools = {t.name: t for t in await mcp.list_tools()}
+        for tool_name in ("execute_python", "create_wrangle"):
+            schema = tools[tool_name].inputSchema
+            assert "justification" in schema["required"], (
+                f"{tool_name} must require a justification"
+            )
 
 
 class TestWorkflowTools:

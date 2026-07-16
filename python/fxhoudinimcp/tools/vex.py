@@ -21,21 +21,28 @@ async def create_wrangle(
     ctx: Context,
     parent_path: str,
     vex_code: str,
+    justification: str,
     run_over: str = "Points",
     name: Optional[str] = None,
 ) -> dict:
     """Create an Attribute Wrangle node with VEX code.
 
-    LAST RESORT — calling this without first checking for a built-in node is
-    a mistake. You MUST call list_node_types(context='<context>', filter='<keyword>')
-    before using this tool and confirm no node covers the operation. Do not skip
-    this check even when you think you know what's available — Houdini ships
-    hundreds of nodes and HDAs that may not be in your training data. Only create
-    a wrangle when the logic genuinely cannot be expressed with any built-in node.
+    LAST RESORT. VEX is for attribute math that no node expresses —
+    NEVER for modeling, scattering, copying, deforming, grouping, or
+    randomizing, which all have dedicated nodes. Building geometry in a
+    wrangle when a native node exists is a failure, not a shortcut.
+
+    The justification parameter is mandatory: state which
+    list_node_types searches you ran and why none of the results can do
+    this. If you cannot write that sentence honestly, you have not
+    checked — check first.
 
     Args:
         parent_path: Parent SOP network path.
         vex_code: VEX snippet to set.
+        justification: Which native nodes you checked (the actual
+            list_node_types filters used) and why none can express this
+            logic.
         run_over: Element to run over ("Points", "Vertices", "Primitives", "Detail", "Numbers").
         name: Node name.
     """
@@ -47,7 +54,10 @@ async def create_wrangle(
     }
     if name is not None:
         params["name"] = name
-    return await bridge.execute("vex.create_wrangle", params)
+    result = await bridge.execute("vex.create_wrangle", params)
+    if isinstance(result, dict):
+        result["justification"] = justification
+    return result
 
 
 @mcp.tool()

@@ -13,6 +13,7 @@ from typing import Any
 import hou
 
 # Internal
+from fxhoudinimcp_server.config import layout_if_enabled
 from fxhoudinimcp_server.dispatcher import register_handler
 
 
@@ -31,7 +32,7 @@ def _focus_network_editor(node: hou.Node) -> None:
     try:
         parent = node.parent()
         if parent is not None:
-            parent.layoutChildren()
+            layout_if_enabled(parent)
         for pane_tab in hou.ui.paneTabs():
             if pane_tab.type() == hou.paneTabType.NetworkEditor:
                 if parent is not None:
@@ -76,7 +77,7 @@ def _get_chop_data(
         num_samples = track.numSamples()
         clip = track.clip()
         sample_rate = clip.sampleRate()
-        start_idx = clip.start()
+        start_idx = int(clip.sampleRange()[0])
         end_idx = start_idx + num_samples - 1
 
         # Compute min/max values
@@ -112,7 +113,7 @@ def _get_chop_data(
         # Apply start/end range if provided
         if start is not None or end is not None:
             clip = track.clip()
-            clip_start = clip.start()
+            clip_start = int(clip.sampleRange()[0])
             s = (start - clip_start) if start is not None else 0
             e = (end - clip_start + 1) if end is not None else len(all_samples)
             s = max(0, s)

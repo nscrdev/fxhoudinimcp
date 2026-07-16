@@ -2,7 +2,7 @@
 
 ## Overview
 
-fxhoudinimcp exposes **167 tools** across **19 categories**, covering every major Houdini context.
+fxhoudinimcp exposes **179 tools** across **22 categories**, covering every major Houdini context.
 
 Once connected, your AI assistant can:
 
@@ -16,15 +16,33 @@ Once connected, your AI assistant can:
 
 ## Categories
 
+### Graph Intelligence (4 tools)
+
+Senior-artist tooling: `build_network` builds whole validated networks
+atomically (with dry-run plan checking), `verify_network` inspects every
+node's errors and cooked geometry, `get_node_card` serves version-exact
+node documentation from the running Houdini, and `find_expensive_nodes`
+profiles cook costs.
+
+### Documentation (2 tools)
+
+`search_help` runs full-text search over the documentation Houdini
+ships in `$HFS/houdini/help` (nodes, VEX, expressions, HOM, Solaris,
+TOPs, character, reference) — always version-exact, no network needed.
+`get_help_page` fetches a full page. On builds without local help, both
+degrade into a clear error pointing at `get_node_card` and the online
+docs.
+
 ### Scene Management (7 tools)
 
-Open, save, import/export, and query scene information.
+Open, save, import/export, query scene information, and inspect the Houdini
+connection status.
 
-### Node Operations (16 tools)
+### Node Operations (17 tools)
 
 Create, delete, copy, connect, layout nodes, and manage flags.
 
-### Parameters (10 tools)
+### Parameters (11 tools)
 
 Get/set parameter values, expressions, keyframes, and spare parameters.
 
@@ -68,7 +86,7 @@ Create/edit wrangle nodes and validate VEX code.
 
 Execute Python, HScript, expressions, and manage environment variables.
 
-### Viewport/UI (10 tools)
+### Viewport/UI (13 tools)
 
 Pane management, viewport screenshots, and error detection.
 
@@ -80,7 +98,7 @@ Network overview, cook chains, selection state, scene summaries, and error analy
 
 One-call Pyro, RBD, FLIP, and Vellum simulation setup. SOP chains and render configuration.
 
-### Materials (4 tools)
+### Materials (5 tools)
 
 List, inspect, and create materials and shader networks.
 
