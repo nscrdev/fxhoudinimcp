@@ -108,7 +108,7 @@ flowchart LR
         direction TB
         B1("🔧 186 Tools")
         B2("📦 8 Resources")
-        B3("💬 6 Prompts")
+        B3("💬 8 Prompts")
     end
 
     subgraph Houdini[" 🔶 SideFX Houdini "]
@@ -316,7 +316,7 @@ The bundled `server_instructions.md` includes a **DOCS-FIRST RULE** telling the 
 | `HOUDINI_PORT` | `8100` | Houdini hwebserver port |
 | `FXHOUDINIMCP_PORT` | `8100` | Port for the Houdini plugin to listen on |
 | `FXHOUDINIMCP_AUTOSTART` | `1` | Set to `0` to disable auto-start |
-| `FXHOUDINIMCP_AUTO_LAYOUT` | `1` | Set to `0` to disable automatic node layout (preserves manual layouts) |
+| `FXHOUDINIMCP_AUTO_LAYOUT` | `0` | Disabled by default in this fork (preserves manual layouts); set to `1` to allow automatic node layout |
 | `MCP_TRANSPORT` | `stdio` | MCP transport (`stdio` or `streamable-http`) |
 | `LOG_LEVEL` | `INFO` | Logging level |
 
