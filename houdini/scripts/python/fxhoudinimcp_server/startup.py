@@ -97,31 +97,49 @@ def start(port: int | None = None) -> None:
     except Exception as exc:
         run_error = exc
 
-    health = _wait_for_current_process_health(_port)
-    if health is None:
-        _server_started = False
-        detail = f": {run_error}" if run_error is not None else ""
-        raise RuntimeError(
-            f"hwebserver did not answer mcp.health on port {_port}{detail}"
-        )
-
-    health_pid = health.get("pid")
-    if health_pid != os.getpid():
-        _server_started = False
-        raise RuntimeError(
-            "hwebserver port {} is owned by another Houdini process "
-            "(pid {}), current pid {}".format(_port, health_pid, os.getpid())
-        )
-
+    # mcp.health is served on Houdini's main thread, so polling it
+    # synchronously here (also the main thread during startup) deadlocks
+    # until the timeout and reports a false failure. Verify from a
+    # background thread instead, once the main loop is free again.
     _server_started = True
-    print(
-        "[fxhoudinimcp] Server ready on port {} "
-        "(Houdini {}, pid {})".format(
-            _port,
-            health.get("houdini_version", "unknown"),
-            health.get("pid", "unknown"),
+
+    def _verify() -> None:
+        global _server_started
+        health = _wait_for_current_process_health(_port, timeout_seconds=10.0)
+        if health is None:
+            _server_started = False
+            detail = f": {run_error}" if run_error is not None else ""
+            print(
+                "[fxhoudinimcp] Startup FAILED: hwebserver did not answer "
+                f"mcp.health on port {_port}{detail}"
+            )
+            return
+
+        health_pid = health.get("pid")
+        if health_pid != os.getpid():
+            _server_started = False
+            print(
+                "[fxhoudinimcp] Startup FAILED: hwebserver port {} is owned "
+                "by another Houdini process (pid {}), current pid {}".format(
+                    _port, health_pid, os.getpid()
+                )
+            )
+            return
+
+        print(
+            "[fxhoudinimcp] Server ready on port {} "
+            "(Houdini {}, pid {})".format(
+                _port,
+                health.get("houdini_version", "unknown"),
+                health.get("pid", "unknown"),
+            )
         )
-    )
+
+    import threading
+
+    threading.Thread(
+        target=_verify, name="fxhoudinimcp-health", daemon=True
+    ).start()
 
 
 def stop() -> None:
