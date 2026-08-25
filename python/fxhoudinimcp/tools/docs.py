@@ -22,9 +22,9 @@ from urllib.parse import quote
 
 # Third-party
 import httpx
-from mcp.server.fastmcp import Context
 
 # Internal
+from fxhoudinimcp._sdk import Context
 from fxhoudinimcp.server import _get_bridge, mcp
 
 logger = logging.getLogger(__name__)

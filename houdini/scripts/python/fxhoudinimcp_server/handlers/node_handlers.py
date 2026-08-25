@@ -177,9 +177,7 @@ def _is_container_hda_wrapper(node: hou.Node) -> bool:
         node_type = node.type()
         if node_type.definition() is None:
             return False
-        if node_type.childTypeCategory() is None:
-            return False
-        return True
+        return node_type.childTypeCategory() is not None
     except (hou.OperationFailed, hou.ObjectWasDeleted, AttributeError):
         return False
 
@@ -401,7 +399,7 @@ def _common_parent_path(paths: list[str]) -> str | None:
     split = [p.rstrip("/").split("/") for p in paths]
     # All paths should be absolute (start with "/"), so split[0][0] == "".
     common: list[str] = []
-    for parts in zip(*split):
+    for parts in zip(*split, strict=False):
         if all(p == parts[0] for p in parts):
             common.append(parts[0])
         else:
