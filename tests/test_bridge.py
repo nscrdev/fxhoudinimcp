@@ -10,7 +10,7 @@ import httpx
 import pytest
 
 # Internal
-from fxhoudinimcp.bridge import HoudiniBridge
+from fxhoudinimcp.bridge import HoudiniBridge, find_servers
 from fxhoudinimcp.errors import ConnectionError, HoudiniCommandError
 
 
@@ -33,6 +33,7 @@ class TestExecute:
     @pytest.fixture
     def mock_response(self):
         """A factory for mock httpx.Response objects."""
+
         def _make(json_data, status_code=200):
             resp = MagicMock(spec=httpx.Response)
             resp.json.return_value = json_data
@@ -44,6 +45,7 @@ class TestExecute:
                 )
                 resp.text = str(json_data)
             return resp
+
         return _make
 
     @pytest.mark.asyncio
@@ -60,10 +62,12 @@ class TestExecute:
 
     @pytest.mark.asyncio
     async def test_houdini_error_raises_command_error(self, bridge, mock_response):
-        resp = mock_response({
-            "status": "error",
-            "error": {"code": "NODE_NOT_FOUND", "message": "Node not found: /bad"},
-        })
+        resp = mock_response(
+            {
+                "status": "error",
+                "error": {"code": "NODE_NOT_FOUND", "message": "Node not found: /bad"},
+            }
+        )
         with patch.object(bridge, "_get_client") as mock_client:
             client = AsyncMock()
             client.post = AsyncMock(return_value=resp)
@@ -93,6 +97,51 @@ class TestExecute:
             with pytest.raises(ConnectionError) as exc_info:
                 await bridge.execute("scene.get_info")
             assert "timed out" in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        ("exc", "expected"),
+        [
+            # _post retries this one on a fresh pool first; reaching the
+            # handler at all means the retry failed too, so Houdini is gone.
+            (
+                httpx.RemoteProtocolError("Server disconnected without sending"),
+                "Cannot connect to Houdini",
+            ),
+            (httpx.ReadError(""), "ReadError"),
+            (httpx.WriteError(""), "WriteError"),
+            (httpx.CloseError(""), "CloseError"),
+            # A TimeoutException subclass, so it keeps the more specific
+            # timeout message from the branch above rather than falling through.
+            (httpx.PoolTimeout(""), "timed out"),
+        ],
+        ids=["remote_protocol", "read", "write", "close", "pool_timeout"],
+    )
+    @pytest.mark.asyncio
+    async def test_transport_errors_are_wrapped(self, bridge, exc, expected):
+        """Every transport failure must surface as our own ConnectionError.
+
+        These used to escape as raw httpx exceptions, and ReadError/WriteError
+        carry an empty message, so the MCP client got a failure with no hint
+        that Houdini was even involved.
+
+        _reset_client is patched alongside _get_client because _post retries a
+        RemoteProtocolError on a fresh pool; left real, that retry would make an
+        actual connection attempt to port 8100 -- slow, and it would resolve
+        differently if a Houdini happened to be listening.
+        """
+        client = AsyncMock()
+        client.post = AsyncMock(side_effect=exc)
+
+        with (
+            patch.object(bridge, "_get_client", return_value=client),
+            patch.object(bridge, "_reset_client", return_value=client),
+            pytest.raises(ConnectionError) as exc_info,
+        ):
+            await bridge.execute("scene.get_info")
+
+        message = str(exc_info.value)
+        assert message.strip()
+        assert expected in message
 
     @pytest.mark.asyncio
     async def test_http_status_error(self, bridge, mock_response):
@@ -146,6 +195,33 @@ class TestHealthCheck:
             with pytest.raises(ConnectionError):
                 await bridge.health_check()
 
+    @pytest.mark.parametrize(
+        "exc",
+        [
+            httpx.RemoteProtocolError("disconnected"),
+            httpx.ReadError(""),
+            httpx.PoolTimeout(""),
+            httpx.ReadTimeout("slow"),
+        ],
+        ids=["remote_protocol", "read", "pool_timeout", "read_timeout"],
+    )
+    @pytest.mark.asyncio
+    async def test_transport_errors_are_wrapped(self, exc):
+        bridge = HoudiniBridge()
+        client = AsyncMock()
+        client.post = AsyncMock(side_effect=exc)
+
+        # See the note in TestExecute: _reset_client must be patched too, or
+        # _post's retry makes a real connection attempt.
+        with (
+            patch.object(bridge, "_get_client", return_value=client),
+            patch.object(bridge, "_reset_client", return_value=client),
+            pytest.raises(ConnectionError) as exc_info,
+        ):
+            await bridge.health_check()
+
+        assert "cannot reach Houdini" in str(exc_info.value)
+
 
 class TestClose:
     @pytest.mark.asyncio
@@ -163,3 +239,126 @@ class TestClose:
     async def test_close_without_client(self):
         bridge = HoudiniBridge()
         await bridge.close()  # should not raise
+
+
+class TestListCommands:
+    """Used to detect a plugin older than this server."""
+
+    @pytest.mark.asyncio
+    async def test_returns_the_command_list(self):
+        bridge = HoudiniBridge()
+        resp = MagicMock(spec=httpx.Response)
+        resp.json.return_value = {"commands": ["scene.get_scene_info", "a.b"]}
+        resp.raise_for_status = MagicMock()
+
+        with patch.object(bridge, "_get_client") as mock_client:
+            client = AsyncMock()
+            client.post = AsyncMock(return_value=resp)
+            mock_client.return_value = client
+
+            assert await bridge.list_commands() == ["scene.get_scene_info", "a.b"]
+
+    @pytest.mark.asyncio
+    async def test_calls_mcp_list_commands_not_mcp_execute(self):
+        """It must work even when the dispatcher is missing commands."""
+        bridge = HoudiniBridge()
+        resp = MagicMock(spec=httpx.Response)
+        resp.json.return_value = {"commands": []}
+        resp.raise_for_status = MagicMock()
+
+        with patch.object(bridge, "_get_client") as mock_client:
+            client = AsyncMock()
+            client.post = AsyncMock(return_value=resp)
+            mock_client.return_value = client
+            await bridge.list_commands()
+
+        body = client.post.call_args.kwargs.get("data") or client.post.call_args[1]["data"]
+        assert "mcp.list_commands" in body["json"]
+
+    @pytest.mark.parametrize("payload", [{}, {"commands": None}, {"commands": "nope"}, []])
+    @pytest.mark.asyncio
+    async def test_unexpected_payload_gives_an_empty_list(self, payload):
+        bridge = HoudiniBridge()
+        resp = MagicMock(spec=httpx.Response)
+        resp.json.return_value = payload
+        resp.raise_for_status = MagicMock()
+
+        with patch.object(bridge, "_get_client") as mock_client:
+            client = AsyncMock()
+            client.post = AsyncMock(return_value=resp)
+            mock_client.return_value = client
+
+            assert await bridge.list_commands() == []
+
+    @pytest.mark.asyncio
+    async def test_transport_failure_is_wrapped(self):
+        bridge = HoudiniBridge()
+        client = AsyncMock()
+        client.post = AsyncMock(side_effect=httpx.ReadError(""))
+
+        with (
+            patch.object(bridge, "_get_client", return_value=client),
+            patch.object(bridge, "_reset_client", return_value=client),
+            pytest.raises(ConnectionError),
+        ):
+            await bridge.list_commands()
+
+
+class TestFindServers:
+    """Client-side discovery: a second Houdini serves on the next free port."""
+
+    def _client(self, answers: dict[int, object]):
+        """A fake client whose reply depends on the port in the URL."""
+
+        def post(url, **kwargs):
+            port = int(url.rsplit(":", 1)[1].split("/")[0])
+            if port not in answers:
+                raise httpx.ConnectError("refused")
+            resp = MagicMock(spec=httpx.Response)
+            resp.json.return_value = answers[port]
+            resp.raise_for_status = MagicMock()
+            return resp
+
+        client = AsyncMock()
+        client.post = AsyncMock(side_effect=post)
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=False)
+        return client
+
+    @pytest.mark.asyncio
+    async def test_finds_nothing_when_no_server_answers(self):
+        with patch("httpx.AsyncClient", return_value=self._client({})):
+            assert await find_servers("localhost", 8100, max_tries=3) == []
+
+    @pytest.mark.asyncio
+    async def test_finds_a_single_server(self):
+        answers = {8100: {"status": "ok", "pid": 11}}
+        with patch("httpx.AsyncClient", return_value=self._client(answers)):
+            found = await find_servers("localhost", 8100, max_tries=3)
+        assert [s["port"] for s in found] == [8100]
+        assert found[0]["pid"] == 11
+
+    @pytest.mark.asyncio
+    async def test_finds_every_session_lowest_port_first(self):
+        answers = {
+            8102: {"status": "ok", "pid": 33},
+            8100: {"status": "ok", "pid": 11},
+        }
+        with patch("httpx.AsyncClient", return_value=self._client(answers)):
+            found = await find_servers("localhost", 8100, max_tries=4)
+        assert [s["port"] for s in found] == [8100, 8102]
+
+    @pytest.mark.asyncio
+    async def test_ignores_a_non_plugin_endpoint(self):
+        """Something else on the port must not be mistaken for Houdini."""
+        answers = {8100: {"unrelated": "service"}, 8101: {"status": "ok", "pid": 9}}
+        with patch("httpx.AsyncClient", return_value=self._client(answers)):
+            found = await find_servers("localhost", 8100, max_tries=3)
+        assert [s["port"] for s in found] == [8101]
+
+    @pytest.mark.asyncio
+    async def test_search_range_matches_the_plugin(self):
+        """Client and plugin must agree, or a moved server is unreachable."""
+        from fxhoudinimcp.bridge import PORT_SEARCH_RANGE
+
+        assert PORT_SEARCH_RANGE == 16

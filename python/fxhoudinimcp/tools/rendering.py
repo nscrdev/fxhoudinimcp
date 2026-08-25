@@ -9,12 +9,13 @@ from __future__ import annotations
 # Built-in
 from typing import Any
 
-# Third-party
-from mcp.server.fastmcp import Context
 from mcp.types import ImageContent, TextContent
 
+# Third-party
+from fxhoudinimcp._sdk import Context
+
 # Internal
-from fxhoudinimcp.server import mcp, _get_bridge
+from fxhoudinimcp.server import _get_bridge, mcp
 from fxhoudinimcp.tools import result_with_image
 
 
@@ -80,16 +81,14 @@ async def get_render_settings(ctx: Context, node_path: str) -> dict:
         node_path: ROP node path.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute(
-        "rendering.get_render_settings", {"node_path": node_path}
-    )
+    return await bridge.execute("rendering.get_render_settings", {"node_path": node_path})
 
 
 @mcp.tool()
 async def set_render_settings(
     ctx: Context,
     node_path: str,
-    settings: dict[str, Any] = {},
+    settings: dict[str, Any] | None = None,
 ) -> dict:
     """Set render parameters on a ROP node.
 
@@ -98,9 +97,11 @@ async def set_render_settings(
         settings: Parameter name-value pairs.
     """
     bridge = _get_bridge(ctx)
+    # The default was a mutable {} literal. None is the safe default, but the
+    # handler is still sent a dict, so the wire format does not change.
     return await bridge.execute(
         "rendering.set_render_settings",
-        {"node_path": node_path, "settings": settings},
+        {"node_path": node_path, "settings": settings or {}},
     )
 
 
@@ -137,10 +138,18 @@ async def start_render(
     node_path: str,
     frame_range: list[float] | None = None,
 ) -> dict:
-    """Render a ROP node.
+    """Execute any node that renders or writes files.
+
+    Not just /out ROPs: a LOP usdrender_rop (which is how Solaris renders), a
+    SOP ROP Geometry, or a File Cache's Save to Disk all work, because what
+    matters is whether the node can be executed rather than its category.
+
+    The result reports the output path it wrote to and whether anything is
+    actually on disk there, so a render that succeeds and writes nowhere is
+    visible instead of silent.
 
     Args:
-        node_path: ROP node path.
+        node_path: Any node with a render() or an 'execute' button.
         frame_range: [start, end] or [start, end, increment].
     """
     bridge = _get_bridge(ctx)
@@ -177,6 +186,4 @@ async def get_render_progress(ctx: Context, node_path: str) -> dict:
         node_path: ROP node path.
     """
     bridge = _get_bridge(ctx)
-    return await bridge.execute(
-        "rendering.get_render_progress", {"node_path": node_path}
-    )
+    return await bridge.execute("rendering.get_render_progress", {"node_path": node_path})

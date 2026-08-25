@@ -10,12 +10,11 @@ from __future__ import annotations
 from typing import Any
 
 # Third-party
-from mcp.server.fastmcp import Context
+from fxhoudinimcp._sdk import Context
 
 # Internal
 from fxhoudinimcp._types import Value
-from fxhoudinimcp.server import mcp, _get_bridge
-
+from fxhoudinimcp.server import _get_bridge, mcp
 
 ###### parameters.get_parameter
 
@@ -39,9 +38,7 @@ async def get_parameter(ctx: Context, node_path: str, parm_name: str) -> dict:
 
 
 @mcp.tool()
-async def set_parameter(
-    ctx: Context, node_path: str, parm_name: str, value: Value
-) -> dict:
+async def set_parameter(ctx: Context, node_path: str, parm_name: str, value: Value) -> dict:
     """Set a parameter value.
 
     Args:
@@ -60,9 +57,7 @@ async def set_parameter(
 
 
 @mcp.tool()
-async def set_parameters(
-    ctx: Context, node_path: str, params: dict[str, Any]
-) -> dict:
+async def set_parameters(ctx: Context, node_path: str, params: dict[str, Any]) -> dict:
     """Batch-set multiple parameters on a node.
 
     Args:
@@ -159,9 +154,7 @@ async def get_expression(ctx: Context, node_path: str, parm_name: str) -> dict:
 
 
 @mcp.tool()
-async def revert_parameter(
-    ctx: Context, node_path: str, parm_name: str
-) -> dict:
+async def revert_parameter(ctx: Context, node_path: str, parm_name: str) -> dict:
     """Revert a parameter to its default value.
 
     Args:
@@ -210,9 +203,7 @@ async def link_parameters(
 
 
 @mcp.tool()
-async def lock_parameter(
-    ctx: Context, node_path: str, parm_name: str, locked: bool
-) -> dict:
+async def lock_parameter(ctx: Context, node_path: str, parm_name: str, locked: bool) -> dict:
     """Lock or unlock a parameter.
 
     Args:
@@ -295,3 +286,33 @@ async def create_spare_parameters(
         payload["folder_name"] = folder_name
         payload["folder_type"] = folder_type
     return await bridge.execute("parameters.create_spare_parameters", payload)
+
+
+@mcp.tool()
+async def get_parameters(
+    ctx: Context,
+    node_path: str,
+    patterns: list[str] | None = None,
+    include_defaults: bool = False,
+) -> dict:
+    """Read many parameter values at once, matched by name or label substring.
+
+    The batch counterpart of set_parameters. Several unrelated groups of
+    settings ("flame", "wind", "buoy") come back in one call instead of one call
+    each, and unlike get_node_card these are the live values on this node rather
+    than the defaults for its type.
+
+    Args:
+        node_path: Node to read.
+        patterns: Substrings matched against parameter name and label. Omit for
+            everything, up to the cap.
+        include_defaults: Also report whether each value is still the default.
+    """
+    bridge = _get_bridge(ctx)
+    params: dict[str, Any] = {
+        "node_path": node_path,
+        "include_defaults": include_defaults,
+    }
+    if patterns is not None:
+        params["patterns"] = patterns
+    return await bridge.execute("parameters.get_parameters", params)

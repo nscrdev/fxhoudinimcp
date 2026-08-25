@@ -12,8 +12,8 @@ import hou
 # Internal
 from fxhoudinimcp_server.dispatcher import register_handler
 
-
 ###### Helpers
+
 
 def _get_parm(node_path: str, parm_name: str) -> hou.Parm:
     """Return a parameter object or raise if the node/parm is not found."""
@@ -60,6 +60,7 @@ def _keyframe_to_dict(key: hou.Keyframe) -> dict:
 
 
 ###### Handlers
+
 
 def _set_keyframe(
     node_path: str,
@@ -159,8 +160,7 @@ def _delete_keyframe(
 
     if not found:
         raise hou.OperationFailed(
-            f"No keyframe found at frame {frame} on parameter "
-            f"'{parm_name}' of node '{node_path}'."
+            f"No keyframe found at frame {frame} on parameter '{parm_name}' of node '{node_path}'."
         )
 
     return {
@@ -191,7 +191,17 @@ def _get_keyframes(
 
 
 def _set_frame(frame: float) -> dict:
-    """Set the current frame."""
+    """Set the current frame.
+
+    Args:
+        frame: Frame number. Non-numeric input used to reach hou.setFrame and come
+            back as "in method 'setFrame', argument 1 of type 'double'", a SWIG
+            binding message that names neither the argument nor this server.
+    """
+    try:
+        frame = float(frame)
+    except (TypeError, ValueError):
+        raise ValueError(f"frame must be a number, not {type(frame).__name__}: {frame!r}") from None
     hou.setFrame(frame)
     return {
         "frame": hou.frame(),
@@ -210,9 +220,7 @@ def _get_frame() -> dict:
 def _set_frame_range(start: float, end: float) -> dict:
     """Set the global frame range."""
     if start >= end:
-        raise hou.OperationFailed(
-            f"start ({start}) must be less than end ({end})."
-        )
+        raise hou.OperationFailed(f"start ({start}) must be less than end ({end}).")
     hou.playbar.setFrameRange(start, end)
 
     # Read back actual values
@@ -227,9 +235,7 @@ def _set_frame_range(start: float, end: float) -> dict:
 def _set_playback_range(start: float, end: float) -> dict:
     """Set the playback range (subset of global range)."""
     if start >= end:
-        raise hou.OperationFailed(
-            f"start ({start}) must be less than end ({end})."
-        )
+        raise hou.OperationFailed(f"start ({start}) must be less than end ({end}).")
     hou.playbar.setPlaybackRange(start, end)
 
     actual_start, actual_end = hou.playbar.playbackRange()
@@ -249,9 +255,7 @@ def _playbar_control(
     action = action.lower().strip()
     valid_actions = ("play", "stop", "reverse")
     if action not in valid_actions:
-        raise hou.OperationFailed(
-            f"Invalid action '{action}'. Must be one of: {valid_actions}"
-        )
+        raise hou.OperationFailed(f"Invalid action '{action}'. Must be one of: {valid_actions}")
 
     # Apply optional settings before acting
     if real_time is not None:

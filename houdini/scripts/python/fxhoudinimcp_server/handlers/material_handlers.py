@@ -6,6 +6,8 @@ materials and shader networks within Houdini.
 
 from __future__ import annotations
 
+import contextlib
+
 # Built-in
 from typing import Any
 
@@ -15,9 +17,10 @@ import hou
 # Internal
 from fxhoudinimcp_server.config import layout_if_enabled
 from fxhoudinimcp_server.dispatcher import register_handler
-
+from fxhoudinimcp_server.errors import as_text, readable_message
 
 ###### Helpers
+
 
 def _get_node(node_path: str) -> hou.Node:
     """Resolve a node path and raise a clear error if it does not exist."""
@@ -56,6 +59,7 @@ def _material_summary(node: hou.Node) -> dict[str, Any]:
 
 ###### materials.list_materials
 
+
 def _list_materials(*, root_path: str = "/mat", **_: Any) -> dict[str, Any]:
     """List all material nodes under the given root path.
 
@@ -65,6 +69,17 @@ def _list_materials(*, root_path: str = "/mat", **_: Any) -> dict[str, Any]:
     Args:
         root_path: Root path to search for materials (default: "/mat").
     """
+    # The requested root must exist. The loop below tolerates a missing node so
+    # that the /stage it adds on its own can be absent, but applying that tolerance
+    # to the caller's own argument meant a misspelled root_path came back
+    # {"count": 0, "materials": []} -- indistinguishable from a scene with no
+    # materials, and the caller goes looking for why its shaders vanished.
+    if hou.node(root_path) is None:
+        raise ValueError(
+            f"Root path not found: {root_path}. Materials usually live under /mat, "
+            f"or under a material library LOP in /stage."
+        )
+
     materials: list[dict[str, Any]] = []
     search_paths = [root_path]
 
@@ -82,10 +97,18 @@ def _list_materials(*, root_path: str = "/mat", **_: Any) -> dict[str, Any]:
             category = node.type().category().name()
 
             # Match material-like node types
-            if category == "Vop" or "material" in type_name.lower() or \
-               "shader" in type_name.lower() or \
-               type_name in ("principledshader::2.0", "principledshader",
-                             "mtlxstandard_surface", "materialbuilder"):
+            if (
+                category == "Vop"
+                or "material" in type_name.lower()
+                or "shader" in type_name.lower()
+                or type_name
+                in (
+                    "principledshader::2.0",
+                    "principledshader",
+                    "mtlxstandard_surface",
+                    "materialbuilder",
+                )
+            ):
                 materials.append(_material_summary(node))
 
     return {
@@ -93,10 +116,12 @@ def _list_materials(*, root_path: str = "/mat", **_: Any) -> dict[str, Any]:
         "materials": materials,
     }
 
+
 register_handler("materials.list_materials", _list_materials)
 
 
 ###### materials.get_material_info
+
 
 def _get_material_info(*, node_path: str, **_: Any) -> dict[str, Any]:
     """Get detailed information about a material node.
@@ -128,11 +153,13 @@ def _get_material_info(*, node_path: str, **_: Any) -> dict[str, Any]:
     try:
         for child in node.children():
             if child.type().category().name() == "Vop":
-                shaders.append({
-                    "name": child.name(),
-                    "path": child.path(),
-                    "type": child.type().name(),
-                })
+                shaders.append(
+                    {
+                        "name": child.name(),
+                        "path": child.path(),
+                        "type": child.type().name(),
+                    }
+                )
     except Exception:
         pass
 
@@ -162,10 +189,12 @@ def _get_material_info(*, node_path: str, **_: Any) -> dict[str, Any]:
         "assignments": assignments,
     }
 
+
 register_handler("materials.get_material_info", _get_material_info)
 
 
 ###### materials.create_material_network
+
 
 def _create_material_network(
     *,
@@ -201,18 +230,16 @@ def _create_material_network(
         node = mat_context.createNode(actual_type, node_name=name)
     except hou.OperationFailed as e:
         raise ValueError(
-            f"Failed to create material of type '{actual_type}' in /mat: {e}"
-        )
+            f"Failed to create material of type '{actual_type}' in /mat: {readable_message(e)}"
+        ) from e
 
     # Set parameters if provided
     if params:
         for parm_name, parm_value in params.items():
             parm = node.parm(parm_name)
             if parm is not None:
-                try:
+                with contextlib.suppress(Exception):
                     parm.set(parm_value)
-                except Exception:
-                    pass
 
     node.moveToGoodPosition()
     _focus_network_editor(node)
@@ -222,10 +249,12 @@ def _create_material_network(
         "shader_type": actual_type,
     }
 
+
 register_handler("materials.create_material_network", _create_material_network)
 
 
 ###### materials.assign_material
+
 
 def _assign_material(
     *,
@@ -283,10 +312,12 @@ def _assign_material(
         "material_sop_path": mat_sop.path(),
     }
 
+
 register_handler("materials.assign_material", _assign_material)
 
 
 ###### materials.list_material_types
+
 
 def _list_material_types(
     *,
@@ -323,21 +354,24 @@ def _list_material_types(
             label = node_type.description()
 
             # Apply filter if provided
-            if filter is not None:
-                filter_lower = filter.lower()
-                if filter_lower not in type_name.lower() and \
-                   filter_lower not in label.lower():
-                    continue
+            filter_lower = as_text(filter, "filter").lower()
+            if filter_lower and (
+                filter_lower not in type_name.lower() and filter_lower not in label.lower()
+            ):
+                continue
 
-            results.append({
-                "name": type_name,
-                "label": label,
-                "category": cat_name,
-            })
+            results.append(
+                {
+                    "name": type_name,
+                    "label": label,
+                    "category": cat_name,
+                }
+            )
 
     return {
         "count": len(results),
         "types": results,
     }
+
 
 register_handler("materials.list_material_types", _list_material_types)

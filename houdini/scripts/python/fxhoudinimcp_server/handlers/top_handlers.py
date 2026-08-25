@@ -14,18 +14,37 @@ import hou
 
 # Internal
 from fxhoudinimcp_server.dispatcher import register_handler
+from fxhoudinimcp_server.errors import readable_message
 
 logger = logging.getLogger(__name__)
 
 
 ###### Helpers
 
+
 def _get_top_node(node_path: str) -> hou.Node:
-    """Return a TOP node or raise if not found."""
+    """Return a TOP node or topnet, or say why the given node is neither.
+
+    This checked only existence despite its name. get_top_network_info on a box SOP
+    returned success with top_node_count 0 and cook_state "unknown", which reads as
+    "this TOP network is empty" -- so a caller starts adding work items to a box
+    instead of being told it picked the wrong node.
+    """
     node = hou.node(node_path)
     if node is None:
         raise ValueError(f"Node not found: {node_path}")
-    return node
+    category = node.type().category().name()
+    if category == "Top":
+        return node
+    # A topnet is an Object whose children are TOPs; every network-level command
+    # here is meant to take one.
+    children = node.childTypeCategory()
+    if children is not None and children.name() == "Top":
+        return node
+    raise ValueError(
+        f"{node_path} is a {category} node ({node.type().name()}), not a TOP node "
+        f"or a topnet. PDG tools work on a topnet or the TOP nodes inside one."
+    )
 
 
 def _get_pdg_node(node: hou.Node):
@@ -39,6 +58,47 @@ def _get_pdg_node(node: hou.Node):
     return pdg_node
 
 
+def _assert_has_generating_node(node: hou.Node) -> None:
+    """Raise unless *node* resolves to a TOP node that produces work items.
+
+    Blocking PDG calls (generateStaticWorkItems(True), cookWorkItems(block=True))
+    run on the main thread here, because the dispatcher marshals every hou.*
+    call through hdefereval. When the target cannot produce work items the
+    blocking call waits on a cook that never starts, and since the main thread
+    is what would advance that cook, Houdini's UI deadlocks and the app has to
+    be force-quit. A freshly created topnet hits this: it contains only a
+    localscheduler, so it is the common case rather than an exotic one.
+
+    Schedulers are the tell -- their PDG object has no ``nodeType``, while
+    Processor/Partitioner/Mapper nodes do.
+    """
+    target = node
+    if node.getPDGNode() is None and hasattr(node, "displayNode"):
+        # TOP networks have no PDG node of their own; they generate through
+        # whichever child is displayed.
+        target = node.displayNode()
+
+    if target is None:
+        raise ValueError(
+            f"TOP network {node.path()} is empty, so there is nothing to "
+            "generate. Add a TOP node (for example wedge or filepattern) first."
+        )
+
+    pdg_node = target.getPDGNode()
+    if pdg_node is None:
+        raise ValueError(
+            f"Node {target.path()} has no PDG node, so it cannot generate "
+            "work items. It may not be a TOP node."
+        )
+
+    if not hasattr(pdg_node, "nodeType"):
+        raise ValueError(
+            f"TOP network {node.path()} contains no work-item-generating "
+            f"nodes -- '{target.name()}' is a scheduler. Add a TOP node "
+            "(for example wedge or filepattern) before generating or cooking."
+        )
+
+
 def _get_graph_context(node: hou.Node):
     """Return the PDG graph context for a TOP node."""
     pdg_node = node.getPDGNode()
@@ -50,6 +110,17 @@ def _get_graph_context(node: hou.Node):
     parent = node
     while parent is not None:
         if parent.type().category().name() == "TopNet" or parent.type().name() == "topnet":
+            # A TOP network has no PDG node of its own -- it cooks through the
+            # node it displays -- so borrow the context from there. Houdini 22
+            # removed hou.pdg entirely, so the legacy lookup below cannot
+            # resolve anything there and this is the path that works.
+            display = parent.displayNode() if hasattr(parent, "displayNode") else None
+            if display is not None:
+                display_pdg = display.getPDGNode()
+                if display_pdg is not None and display_pdg.context is not None:
+                    return display_pdg.context
+
+            # Legacy path for Houdini versions that still expose hou.pdg.
             try:
                 contexts = hou.pdg.GraphContext.contexts()
                 for ctx in contexts:
@@ -111,7 +182,9 @@ def _work_item_to_dict(work_item) -> dict:
                     "values": list(attrib.values),
                 }
             except (AttributeError, TypeError) as e:
-                logger.debug("Could not read work item attribute values for '%s': %s", attrib.name, e)
+                logger.debug(
+                    "Could not read work item attribute values for '%s': %s", attrib.name, e
+                )
                 attribs[attrib.name] = {"type": str(attrib.type), "values": []}
         info["attributes"] = attribs
     except (AttributeError, TypeError) as e:
@@ -121,8 +194,7 @@ def _work_item_to_dict(work_item) -> dict:
     # Collect output files
     try:
         info["output_files"] = [
-            {"path": rf.path, "tag": rf.tag, "hash": rf.hash}
-            for rf in work_item.resultData
+            {"path": rf.path, "tag": rf.tag, "hash": rf.hash} for rf in work_item.resultData
         ]
     except (AttributeError, TypeError) as e:
         logger.debug("Could not read work item output files: %s", e)
@@ -132,6 +204,7 @@ def _work_item_to_dict(work_item) -> dict:
 
 
 ###### tops.get_top_network_info
+
 
 def get_top_network_info(node_path: str) -> dict:
     """Return an overview of a TOP network.
@@ -149,8 +222,7 @@ def get_top_network_info(node_path: str) -> dict:
     else:
         topnet = node.parent()
         if topnet is None or (
-            topnet.type().category().name() != "TopNet"
-            and topnet.type().name() != "topnet"
+            topnet.type().category().name() != "TopNet" and topnet.type().name() != "topnet"
         ):
             topnet = node
 
@@ -174,9 +246,11 @@ def get_top_network_info(node_path: str) -> dict:
 
         # Determine if it is a scheduler
         try:
-            if hasattr(child, "isScheduler") and child.isScheduler():
-                scheduler_nodes.append(child_info)
-            elif "scheduler" in child_type.lower():
+            if (
+                hasattr(child, "isScheduler")
+                and child.isScheduler()
+                or "scheduler" in child_type.lower()
+            ):
                 scheduler_nodes.append(child_info)
             else:
                 top_nodes.append(child_info)
@@ -208,6 +282,7 @@ def get_top_network_info(node_path: str) -> dict:
 
 ###### tops.cook_top_node
 
+
 def cook_top_node(
     node_path: str,
     block: bool = True,
@@ -221,6 +296,8 @@ def cook_top_node(
         generate_only: If True, only generate work items without cooking.
     """
     node = _get_top_node(node_path)
+    if block or generate_only:
+        _assert_has_generating_node(node)
 
     if generate_only:
         try:
@@ -246,7 +323,7 @@ def cook_top_node(
         try:
             node.executeGraph(False, False)
         except Exception as e:
-            raise ValueError(f"Failed to start non-blocking cook: {e}")
+            raise ValueError(f"Failed to start non-blocking cook: {readable_message(e)}") from e
 
     # Gather result info
     result = {
@@ -276,6 +353,7 @@ def cook_top_node(
 
 ###### tops.cancel_top_cook
 
+
 def cancel_top_cook(node_path: str) -> dict:
     """Cancel any active cooking on a TOP network.
 
@@ -288,7 +366,7 @@ def cancel_top_cook(node_path: str) -> dict:
         ctx = _get_graph_context(node)
         ctx.cancelCook()
     except Exception as e:
-        raise ValueError(f"Failed to cancel cook: {e}")
+        raise ValueError(f"Failed to cancel cook: {readable_message(e)}") from e
 
     return {
         "success": True,
@@ -298,6 +376,7 @@ def cancel_top_cook(node_path: str) -> dict:
 
 
 ###### tops.pause_top_cook
+
 
 def pause_top_cook(node_path: str) -> dict:
     """Pause cooking on a TOP network.
@@ -311,7 +390,7 @@ def pause_top_cook(node_path: str) -> dict:
         ctx = _get_graph_context(node)
         ctx.pauseCook()
     except Exception as e:
-        raise ValueError(f"Failed to pause cook: {e}")
+        raise ValueError(f"Failed to pause cook: {readable_message(e)}") from e
 
     return {
         "success": True,
@@ -321,6 +400,7 @@ def pause_top_cook(node_path: str) -> dict:
 
 
 ###### tops.dirty_work_items
+
 
 def dirty_work_items(node_path: str, remove_outputs: bool = False) -> dict:
     """Dirty (invalidate) work items on a TOP node so they can be regenerated.
@@ -354,6 +434,7 @@ def dirty_work_items(node_path: str, remove_outputs: bool = False) -> dict:
 
 ###### tops.get_work_item_states
 
+
 def get_work_item_states(node_path: str) -> dict:
     """Return the count of work items in each state for a TOP node.
 
@@ -376,7 +457,7 @@ def get_work_item_states(node_path: str) -> dict:
             state_counts[state_name] = state_counts.get(state_name, 0) + 1
             total += 1
     except Exception as e:
-        raise ValueError(f"Failed to read work items: {e}")
+        raise ValueError(f"Failed to read work items: {readable_message(e)}") from e
 
     return {
         "node_path": node.path(),
@@ -386,6 +467,7 @@ def get_work_item_states(node_path: str) -> dict:
 
 
 ###### tops.get_work_item_info
+
 
 def get_work_item_info(node_path: str, work_item_index: int) -> dict:
     """Return detailed information about a specific work item.
@@ -400,7 +482,7 @@ def get_work_item_info(node_path: str, work_item_index: int) -> dict:
     try:
         work_items = list(pdg_node.workItems)
     except Exception as e:
-        raise ValueError(f"Failed to read work items: {e}")
+        raise ValueError(f"Failed to read work items: {readable_message(e)}") from e
 
     if work_item_index < 0 or work_item_index >= len(work_items):
         raise ValueError(
@@ -416,6 +498,7 @@ def get_work_item_info(node_path: str, work_item_index: int) -> dict:
 
 
 ###### tops.get_pdg_graph
+
 
 def get_pdg_graph(node_path: str) -> dict:
     """Return the PDG dependency graph structure for a TOP network.
@@ -464,11 +547,13 @@ def get_pdg_graph(node_path: str) -> dict:
             for connector in input_connectors:
                 src_node = connector.inputNode()
                 if src_node is not None:
-                    edges.append({
-                        "from": src_node.path(),
-                        "to": child.path(),
-                        "input_index": input_idx,
-                    })
+                    edges.append(
+                        {
+                            "from": src_node.path(),
+                            "to": child.path(),
+                            "input_index": input_idx,
+                        }
+                    )
 
     return {
         "network_path": topnet.path(),
@@ -481,6 +566,7 @@ def get_pdg_graph(node_path: str) -> dict:
 
 ###### tops.generate_static_items
 
+
 def generate_static_items(node_path: str) -> dict:
     """Generate static work items on a TOP node without cooking them.
 
@@ -490,6 +576,7 @@ def generate_static_items(node_path: str) -> dict:
         node_path: Path to the TOP node.
     """
     node = _get_top_node(node_path)
+    _assert_has_generating_node(node)
 
     try:
         node.generateStaticWorkItems(True)
@@ -498,7 +585,7 @@ def generate_static_items(node_path: str) -> dict:
             pdg_node = _get_pdg_node(node)
             pdg_node.generateStaticItems()
         except Exception as e:
-            raise ValueError(f"Failed to generate static items: {e}")
+            raise ValueError(f"Failed to generate static items: {readable_message(e)}") from e
 
     # Gather generated item info
     generated_count = 0
@@ -518,6 +605,7 @@ def generate_static_items(node_path: str) -> dict:
 
 
 ###### tops.get_top_scheduler_info
+
 
 def get_top_scheduler_info(node_path: str) -> dict:
     """Return information about a TOP scheduler node.
@@ -550,9 +638,11 @@ def get_top_scheduler_info(node_path: str) -> dict:
         schedulers = []
         for child in topnet.children():
             try:
-                if hasattr(child, "isScheduler") and child.isScheduler():
-                    schedulers.append(child)
-                elif "scheduler" in child.type().name().lower():
+                if (
+                    hasattr(child, "isScheduler")
+                    and child.isScheduler()
+                    or "scheduler" in child.type().name().lower()
+                ):
                     schedulers.append(child)
             except (hou.OperationFailed, AttributeError) as e:
                 logger.debug("Could not check scheduler status for '%s': %s", child.name(), e)
@@ -595,8 +685,11 @@ def _build_scheduler_info(sched_node: hou.Node) -> dict:
 
     # Read common scheduler parameters
     parm_names = [
-        "pdg_maxitems", "pdg_maxprocs", "pdg_workingdir",
-        "pdg_tempdirname", "maxprocsmenu",
+        "pdg_maxitems",
+        "pdg_maxprocs",
+        "pdg_workingdir",
+        "pdg_tempdirname",
+        "maxprocsmenu",
     ]
     parms = {}
     for pname in parm_names:

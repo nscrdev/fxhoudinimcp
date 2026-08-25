@@ -14,6 +14,7 @@ import contextlib
 import json
 import os
 import tempfile
+import time
 import zipfile
 from difflib import get_close_matches
 from typing import Any
@@ -24,8 +25,19 @@ import hou
 # Internal
 from fxhoudinimcp_server.config import layout_if_enabled
 from fxhoudinimcp_server.dispatcher import register_handler
+from fxhoudinimcp_server.errors import readable_message
 
 ###### Helpers
+
+# Folder types whose contents are instance templates rather than parameters.
+# MultiparmBlock is the common one; the scroll and tab variants behave the same
+# way for naming purposes.
+_MULTIPARM_FOLDERS = tuple(
+    getattr(hou.folderType, name)
+    for name in ("MultiparmBlock", "ScrollingMultiparmBlock", "TabbedMultiparmBlock")
+    if hasattr(hou.folderType, name)
+)
+
 
 def _resolve_node_type(category: hou.NodeTypeCategory, type_name: str):
     """Resolve *type_name* in *category* the way createNode would.
@@ -64,9 +76,7 @@ def _apply_parm(node: hou.Node, name: str, value: Any) -> None:
         if parm_tuple is None:
             raise ValueError(f"'{name}' is not a parm tuple")
         if len(value) != len(parm_tuple):
-            raise ValueError(
-                f"'{name}' has {len(parm_tuple)} components, got {len(value)}"
-            )
+            raise ValueError(f"'{name}' has {len(parm_tuple)} components, got {len(value)}")
         if all(isinstance(v, (int, float)) for v in value):
             parm_tuple.set([float(v) for v in value])
         else:
@@ -118,6 +128,7 @@ def _geometry_summary(node: hou.Node) -> dict[str, Any] | None:
 
 ###### graph.build_network
 
+
 def build_network(
     parent_path: str,
     nodes: list,
@@ -151,16 +162,28 @@ def build_network(
     parent = hou.node(parent_path)
     errors: list[str] = []
     if parent is None:
-        return {"valid": False, "errors": [f"Parent not found: {parent_path}"]}
+        return {
+            "success": False,
+            "valid": False,
+            "errors": [f"Parent not found: {parent_path}"],
+            # Every other command reports a single message; carry one here too so a
+            # caller does not have to know that this one answers in a list.
+            "message": f"Parent not found: {parent_path}",
+        }
     category = parent.childTypeCategory()
     if category is None:
         return {
+            "success": False,
             "valid": False,
             "errors": [f"{parent_path} cannot contain child nodes"],
         }
 
     if not isinstance(nodes, list) or not nodes:
-        return {"valid": False, "errors": ["'nodes' must be a non-empty list"]}
+        return {
+            "success": False,
+            "valid": False,
+            "errors": ["'nodes' must be a non-empty list"],
+        }
 
     ###### Phase 1: validate everything before touching the scene
 
@@ -177,13 +200,10 @@ def build_network(
         if type_name not in resolved_types:
             node_type = _resolve_node_type(category, type_name)
             if node_type is None:
-                close = get_close_matches(
-                    type_name, list(category.nodeTypes()), n=3, cutoff=0.5
-                )
+                close = get_close_matches(type_name, list(category.nodeTypes()), n=3, cutoff=0.5)
                 hint = f" Did you mean: {close}?" if close else ""
                 errors.append(
-                    f"node {label}: type '{type_name}' does not exist in "
-                    f"{category.name()}.{hint}"
+                    f"node {label}: type '{type_name}' does not exist in {category.name()}.{hint}"
                 )
                 continue
             resolved_types[type_name] = node_type
@@ -192,9 +212,7 @@ def build_network(
             if name in spec_names:
                 errors.append(f"duplicate node name in spec: '{name}'")
             if name in existing:
-                errors.append(
-                    f"node '{name}' already exists under {parent_path}"
-                )
+                errors.append(f"node '{name}' already exists under {parent_path}")
             spec_names.append(name)
 
     # Learn parameter names by instantiating each unique type once (probe
@@ -203,17 +221,11 @@ def build_network(
     # errors exist: report everything in one pass.
     parm_knowledge: dict[str, tuple[set, set]] = {}
     if resolved_types:
-        display_before = (
-            parent.displayNode() if hasattr(parent, "displayNode") else None
-        )
-        render_before = (
-            parent.renderNode() if hasattr(parent, "renderNode") else None
-        )
+        display_before = parent.displayNode() if hasattr(parent, "displayNode") else None
+        render_before = parent.renderNode() if hasattr(parent, "renderNode") else None
         try:
             for type_name, node_type in resolved_types.items():
-                parm_knowledge[type_name] = _parm_names_for_type(
-                    parent, node_type
-                )
+                parm_knowledge[type_name] = _parm_names_for_type(parent, node_type)
         finally:
             with contextlib.suppress(Exception):
                 if display_before is not None:
@@ -226,10 +238,12 @@ def build_network(
         knowledge = parm_knowledge.get(spec.get("type"))
         if knowledge:
             parm_names, tuple_names = knowledge
-            for parm_name in (spec.get("parms") or {}):
+            for parm_name in spec.get("parms") or {}:
                 if parm_name not in parm_names and parm_name not in tuple_names:
                     close = get_close_matches(
-                        parm_name, sorted(parm_names | tuple_names), n=3,
+                        parm_name,
+                        sorted(parm_names | tuple_names),
+                        n=3,
                         cutoff=0.5,
                     )
                     hint = f" Did you mean: {close}?" if close else ""
@@ -261,15 +275,14 @@ def build_network(
                 )
 
     if errors:
-        return {"valid": False, "errors": errors, "created": []}
+        return {"success": False, "valid": False, "errors": errors, "created": []}
     if dry_run:
         return {
+            "success": True,
             "valid": True,
             "dry_run": True,
             "validated_nodes": len(nodes),
-            "validated_types": sorted(
-                t.name() for t in resolved_types.values()
-            ),
+            "validated_types": sorted(t.name() for t in resolved_types.values()),
         }
 
     ###### Phase 2: build (atomic — any failure rolls back)
@@ -277,9 +290,7 @@ def build_network(
     created: dict[str, hou.Node] = {}
     try:
         for spec in nodes:
-            node = parent.createNode(
-                resolved_types[spec["type"]].name(), spec.get("name")
-            )
+            node = parent.createNode(resolved_types[spec["type"]].name(), spec.get("name"))
             created[spec.get("name") or node.name()] = node
 
         for spec, node in zip(nodes, created.values(), strict=False):
@@ -288,7 +299,7 @@ def build_network(
                     _apply_parm(node, parm_name, value)
                 except Exception as exc:
                     raise RuntimeError(
-                        f"{node.path()} parm '{parm_name}': {exc}"
+                        f"{node.path()} parm '{parm_name}': {readable_message(exc)}"
                     ) from exc
             for input_index, entry in enumerate(spec.get("inputs") or []):
                 if isinstance(entry, dict):
@@ -322,8 +333,9 @@ def build_network(
             with contextlib.suppress(Exception):
                 node.destroy()
         return {
+            "success": False,
             "valid": False,
-            "errors": [f"build failed and was rolled back: {exc}"],
+            "errors": [f"build failed and was rolled back: {readable_message(exc)}"],
             "created": [],
         }
 
@@ -341,6 +353,7 @@ def build_network(
     reports = [_node_report(node) for node in created.values()]
     error_nodes = [r["path"] for r in reports if r["errors"]]
     return {
+        "success": True,
         "valid": True,
         "created": reports,
         "display_node": display.path() if display is not None else None,
@@ -351,6 +364,7 @@ def build_network(
 
 
 ###### graph.verify_network
+
 
 def verify_network(parent_path: str, **_: Any) -> dict:
     """Inspect every node in a network: the 'middle-click everything' pass.
@@ -371,11 +385,7 @@ def verify_network(parent_path: str, **_: Any) -> dict:
     reports = []
     for child in parent.children():
         report = _node_report(child)
-        report["display"] = (
-            child.isDisplayFlagSet()
-            if hasattr(child, "isDisplayFlagSet")
-            else None
-        )
+        report["display"] = child.isDisplayFlagSet() if hasattr(child, "isDisplayFlagSet") else None
         reports.append(report)
 
     error_nodes = [r["path"] for r in reports if r["errors"]]
@@ -411,9 +421,8 @@ _CATEGORY_HELP_DIRS = {
 def _help_text(node_type, category_name: str) -> str | None:
     """Houdini's own help for a node type, version-exact, headless-safe."""
     global _HELP_ZIP_INDEX
-    zip_path = os.path.join(
-        hou.expandString("$HFS"), "houdini", "help", "nodes.zip"
-    )
+    # hou.text.expandString, not the deprecated hou.expandString.
+    zip_path = os.path.join(hou.text.expandString("$HFS"), "houdini", "help", "nodes.zip")
     if _HELP_ZIP_INDEX is None:
         _HELP_ZIP_INDEX = {}
         if os.path.isfile(zip_path):
@@ -459,48 +468,90 @@ def get_node_card(
     categories = hou.nodeTypeCategories()
     category = categories.get(context)
     if category is None:
-        raise ValueError(
-            f"Unknown context '{context}'. "
-            f"Available: {sorted(categories.keys())}"
-        )
+        raise ValueError(f"Unknown context '{context}'. Available: {sorted(categories.keys())}")
     resolved = _resolve_node_type(category, node_type)
     if resolved is None:
-        close = get_close_matches(
-            node_type, list(category.nodeTypes()), n=5, cutoff=0.4
-        )
-        raise ValueError(
-            f"Node type '{node_type}' not found in {context}. "
-            f"Close matches: {close}"
-        )
+        close = get_close_matches(node_type, list(category.nodeTypes()), n=5, cutoff=0.4)
+        raise ValueError(f"Node type '{node_type}' not found in {context}. Close matches: {close}")
 
     parms: list[dict[str, Any]] = []
     _PARM_CAP = 80
+    _MENU_CAP = 15
     truncated = False
+    matched = 0
     for template in resolved.parmTemplateGroup().entriesWithoutFolders():
-        if template.isHidden():
-            continue
         name, label = template.name(), template.label()
-        if parm_filter and parm_filter.lower() not in name.lower() \
-                and parm_filter.lower() not in label.lower():
+        if (
+            parm_filter
+            and parm_filter.lower() not in name.lower()
+            and parm_filter.lower() not in label.lower()
+        ):
             continue
+        matched += 1
         if len(parms) >= _PARM_CAP:
             truncated = True
-            break
+            continue
         entry: dict[str, Any] = {
             "name": name,
             "label": label,
             "type": template.type().name(),
             "size": template.numComponents(),
         }
+        # Hidden parameters are still settable, and skipping them silently made
+        # this card answer "that parameter does not exist" about parameters that
+        # do. Reported and flagged instead, so a caller can tell the difference
+        # between hidden and absent.
+        if template.isHidden():
+            entry["hidden"] = True
+        # A name containing '#' is a multiparm instance template, not a real
+        # parameter name: the live parameters are source_volume1, source_volume2
+        # and so on. Saying so here saves discovering it by trial and error.
+        if "#" in name:
+            entry["multiparm_instance"] = True
         with contextlib.suppress(Exception):
             entry["default"] = list(template.defaultValue())
-        try:
-            items = template.menuItems()
+        with contextlib.suppress(Exception):
+            items = list(template.menuItems())
             if items:
-                entry["menu"] = list(items)[:15]
-        except Exception:
-            pass
+                entry["menu"] = items[:_MENU_CAP]
+                if len(items) > _MENU_CAP:
+                    # Silent truncation reads as "these are all the options",
+                    # which is how a caller picks a token that is not in a menu
+                    # it never saw the rest of.
+                    entry["menu_truncated"] = True
+                    entry["menu_count"] = len(items)
         parms.append(entry)
+
+    # Multiparm blocks, which are the reason a parameter can be real and yet
+    # findable under no name the caller can guess: the folder's own name is the
+    # instance count parameter, and the contents are templates with '#' in them.
+    # Recursive, because a multiparm block is almost always nested inside a
+    # regular tab folder rather than sitting at the top level. Walking only the
+    # top level found none on any real node type.
+    multiparms: list[dict[str, Any]] = []
+
+    def _collect_multiparms(entries) -> None:
+        for folder in entries:
+            if not isinstance(folder, hou.FolderParmTemplate):
+                continue
+            with contextlib.suppress(Exception):
+                if folder.folderType() in _MULTIPARM_FOLDERS:
+                    multiparms.append(
+                        {
+                            "count_parm": folder.name(),
+                            "label": folder.label(),
+                            "folder_type": folder.folderType().name(),
+                            "instance_parms": [
+                                child.name()
+                                for child in folder.parmTemplates()
+                                if "#" in child.name()
+                            ][:_PARM_CAP],
+                        }
+                    )
+            with contextlib.suppress(Exception):
+                _collect_multiparms(folder.parmTemplates())
+
+    _collect_multiparms(resolved.parmTemplateGroup().entries())
 
     help_text = _help_text(resolved, context) if include_help else None
     if help_text and len(help_text) > 5000:
@@ -515,13 +566,16 @@ def get_node_card(
         "max_outputs": resolved.maxNumOutputs(),
         "is_generator": resolved.minNumInputs() == 0,
         "parm_count": len(parms),
+        "parms_matched": matched,
         "parms_truncated": truncated,
         "parms": parms,
+        "multiparms": multiparms,
         "help": help_text,
     }
 
 
 ###### graph.find_expensive_nodes
+
 
 def find_expensive_nodes(
     root_path: str = "/",
@@ -582,8 +636,15 @@ def find_expensive_nodes(
 
     def _walk(entry: dict, path_parts: list[str]) -> None:
         name = entry.get("name", "")
-        is_real_node = bool(name) and not name.startswith("{") and name not in (
-            "Total Statistics", "Other", "Nodes",
+        is_real_node = (
+            bool(name)
+            and not name.startswith("{")
+            and name
+            not in (
+                "Total Statistics",
+                "Other",
+                "Nodes",
+            )
         )
         parts = path_parts + [name] if is_real_node else path_parts
         cook_ms = 0.0
@@ -601,9 +662,7 @@ def find_expensive_nodes(
     return {
         "root_path": root_path,
         "cooked_nodes": len(targets),
-        "top_nodes": [
-            {"path": path, "cook_ms": round(ms, 2)} for ms, path in rows[:limit]
-        ],
+        "top_nodes": [{"path": path, "cook_ms": round(ms, 2)} for ms, path in rows[:limit]],
         "note": (
             "cook_ms is cumulative (parents include children); compare "
             "siblings to find the real hotspot"
@@ -617,3 +676,205 @@ register_handler("graph.build_network", build_network)
 register_handler("graph.verify_network", verify_network)
 register_handler("graph.get_node_card", get_node_card)
 register_handler("graph.find_expensive_nodes", find_expensive_nodes)
+
+
+###### graph.cook_frame_range
+
+# A sequential solver has to be cooked in order, one frame at a time, and the
+# only evidence that it is doing anything is how its output changes across those
+# frames. Doing that from the client costs one round trip per frame -- ~50ms
+# each before any work happens -- so a 100 frame check was 100 round trips, and
+# the alternative was execute_python. Six of thirteen execute_python calls in one
+# recorded session were this, every one of them explaining that no tool steps a
+# SOP-level solver. step_simulation does not: it requires a DOP network, never
+# cooks, and returns no measurements.
+_MAX_FRAMES = 480
+_FRAME_ATTRIB_CAP = 8
+
+
+def _frame_measurement(
+    node: hou.Node,
+    attribs: list[str] | None,
+    volumes: bool,
+) -> dict[str, Any]:
+    """What changed on this frame: counts, errors, and the asked-for aggregates."""
+    row: dict[str, Any] = {}
+    geo = node.geometry()
+    if geo is None:
+        row["points"] = row["prims"] = 0
+        return row
+    row["points"] = len(geo.iterPoints())
+    row["prims"] = len(geo.iterPrims())
+
+    if attribs:
+        from fxhoudinimcp_server.handlers.geometry_handlers import _get_attrib_stats
+
+        stats = _get_attrib_stats(
+            node_path=node.path(),
+            attribs=attribs[:_FRAME_ATTRIB_CAP],
+            attrib_class="point",
+        )
+        row["attribs"] = {
+            name: {k: v for k, v in entry.items() if k in ("min", "max", "mean", "sum")}
+            for name, entry in stats["stats"].items()
+        }
+        if stats["missing"]:
+            row["missing_attribs"] = stats["missing"]
+
+    if volumes:
+        from fxhoudinimcp_server.handlers.geometry_handlers import _get_volume_info
+
+        info = _get_volume_info(node_path=node.path())
+        row["volumes"] = [
+            {
+                k: v
+                for k, v in entry.items()
+                if k in ("name", "resolution", "active_voxels", "min_value", "max_value")
+            }
+            for entry in info["volumes"]
+        ]
+    return row
+
+
+def cook_frame_range(
+    node_path: str,
+    start: float | None = None,
+    end: float | None = None,
+    step: float = 1.0,
+    attribs: list[str] | str | None = None,
+    volumes: bool = False,
+    **_: Any,
+) -> dict[str, Any]:
+    """Cook a node frame by frame and report what changed on each frame.
+
+    This is the tool for proving a simulation is doing something, and the only
+    correct way to advance a sequential solver: frames are cooked in order, so a
+    SOP solver, a DOP network or a plain animated chain all accumulate properly.
+
+    The frame is left at the last one cooked, because that is what stepping a
+    solver means; the caller usually wants to screenshot or read it afterwards.
+
+    Args:
+        node_path: Node to cook. Its output is what gets measured.
+        start: First frame. Defaults to the playbar start.
+        end: Last frame, inclusive. Defaults to the playbar end.
+        step: Frame increment. 1.0 for a sequential solver -- skipping frames
+            gives a solver a discontinuous time step and invalid results.
+        attribs: Point attributes to aggregate per frame (min/max/mean/sum).
+        volumes: Also report per-volume name, resolution and value range.
+    """
+    node = hou.node(node_path)
+    if node is None:
+        raise hou.OperationFailed(f"Node not found: {node_path}")
+
+    playbar_start, playbar_end = hou.playbar.frameRange()
+    start = float(playbar_start if start is None else start)
+    end = float(playbar_end if end is None else end)
+    if step <= 0:
+        raise ValueError("step must be greater than 0")
+    if end < start:
+        raise ValueError(f"end ({end}) is before start ({start})")
+
+    count = int((end - start) / step) + 1
+    if count > _MAX_FRAMES:
+        raise ValueError(
+            f"{count} frames requested; the cap is {_MAX_FRAMES}. Narrow the "
+            "range, or raise step if the node is not a sequential solver."
+        )
+
+    if isinstance(attribs, str):
+        attribs = [attribs]
+
+    frames: list[dict[str, Any]] = []
+    total_ms = 0.0
+    first_error_frame: float | None = None
+
+    for index in range(count):
+        frame = start + index * step
+        hou.setFrame(frame)
+        began = time.time()
+        try:
+            node.cook(force=False)
+            cook_error = None
+        except hou.OperationFailed as exc:
+            # A cook failure is data, not a reason to abandon the range: a solver
+            # that fails on one frame and recovers is exactly what the caller is
+            # trying to see.
+            cook_error = str(exc).splitlines()[0][:200]
+        elapsed_ms = round((time.time() - began) * 1000, 1)
+        total_ms += elapsed_ms
+
+        row: dict[str, Any] = {"frame": frame, "cook_ms": elapsed_ms}
+        if cook_error:
+            row["cook_error"] = cook_error
+        with contextlib.suppress(hou.OperationFailed):
+            row["errors"] = [e.splitlines()[0][:200] for e in node.errors()]
+            row["warnings"] = [w.splitlines()[0][:200] for w in node.warnings()]
+        if row.get("errors") and first_error_frame is None:
+            first_error_frame = frame
+        try:
+            row.update(_frame_measurement(node, attribs, volumes))
+        except hou.OperationFailed as exc:
+            row["measure_error"] = str(exc).splitlines()[0][:200]
+        frames.append(row)
+
+    return {
+        "node_path": node_path,
+        "start": start,
+        "end": end,
+        "step": step,
+        "frames_cooked": len(frames),
+        "total_cook_ms": round(total_ms, 1),
+        "mean_cook_ms": round(total_ms / len(frames), 1) if frames else 0.0,
+        "first_error_frame": first_error_frame,
+        "current_frame": hou.frame(),
+        "frames": frames,
+    }
+
+
+register_handler("graph.cook_frame_range", cook_frame_range)
+
+
+###### graph.get_cook_status
+
+
+def get_cook_status(node_path: str = "/obj", **_: Any) -> dict:
+    """Whether a node has cooked, how often, and whether it changes per frame.
+
+    Read the limitation first: every command runs on Houdini's main thread, so a
+    long cook BLOCKS the bridge and cannot be polled from outside while it runs.
+    A recorded session ended up watching the Houdini process's CPU from
+    PowerShell for exactly that reason, and no tool can change that shape. What
+    this answers is the after-the-fact question -- did the thing actually recook,
+    is it time dependent, did it end up in error. For genuinely asynchronous
+    work, use a ROP's background execution and poll get_render_progress.
+
+    Args:
+        node_path: Node to report on.
+    """
+    node = hou.node(node_path)
+    if node is None:
+        raise hou.OperationFailed(f"Node not found: {node_path}")
+
+    result: dict[str, Any] = {
+        "node_path": node.path(),
+        "type": node.type().name(),
+        "frame": hou.frame(),
+    }
+    for key, method in (
+        ("cook_count", "cookCount"),
+        ("is_time_dependent", "isTimeDependent"),
+    ):
+        with contextlib.suppress(Exception):
+            result[key] = getattr(node, method)()
+    with contextlib.suppress(Exception):
+        result["errors"] = [e.splitlines()[0][:200] for e in node.errors()]
+        result["warnings"] = [w.splitlines()[0][:200] for w in node.warnings()]
+    with contextlib.suppress(Exception):
+        result["unsaved_changes"] = hou.hipFile.hasUnsavedChanges()
+    with contextlib.suppress(Exception):
+        result["hip_file"] = hou.hipFile.path()
+    return result
+
+
+register_handler("graph.get_cook_status", get_cook_status)

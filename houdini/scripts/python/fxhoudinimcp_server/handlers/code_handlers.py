@@ -17,7 +17,7 @@ import hou
 
 # Internal
 from fxhoudinimcp_server.dispatcher import register_handler
-
+from fxhoudinimcp_server.errors import as_text
 
 ###### Constants
 
@@ -53,9 +53,7 @@ def _serialize_result(value: Any) -> Any:
 ###### Handler: code.execute_python
 
 
-def _execute_python(
-    code: str, return_expression: str | None = None, **_: Any
-) -> dict[str, Any]:
+def _execute_python(code: str, return_expression: str | None = None, **_: Any) -> dict[str, Any]:
     """Execute arbitrary Python code inside Houdini's interpreter.
 
     The code is executed via `exec()` in a namespace that has `hou`
@@ -86,6 +84,10 @@ def _execute_python(
 
     if exec_error:
         response: dict[str, Any] = {
+            # "executed" predates the server-wide "success" convention. Code that
+            # raised is a failure, and a caller checking the usual key got None --
+            # falsy, but not False, and easy to read as "no opinion".
+            "success": False,
             "executed": False,
             "error": exec_error,
         }
@@ -105,6 +107,9 @@ def _execute_python(
 
     if eval_error:
         response = {
+            # The code ran, but the expression the caller asked to evaluate did
+            # not, so the answer they wanted is missing.
+            "success": False,
             "executed": True,
             "return_value": None,
             "eval_error": eval_error,
@@ -116,6 +121,7 @@ def _execute_python(
         return response
 
     response = {
+        "success": True,
         "executed": True,
         "return_value": _serialize_result(result),
     }
@@ -134,7 +140,9 @@ register_handler("code.execute_python", _execute_python)
 
 def _execute_hscript(command: str, **_: Any) -> dict[str, Any]:
     """Execute an HScript command and return its output."""
-    output, errors = hou.hscript(command)
+    # A non-string reached the SWIG binding and came back as "in method
+    # 'hscript', argument 1 of type 'char const *'".
+    output, errors = hou.hscript(as_text(command, "command"))
 
     return {
         "output": _truncate_output(output) if output else output,
@@ -148,9 +156,7 @@ register_handler("code.execute_hscript", _execute_hscript)
 ###### Handler: code.evaluate_expression
 
 
-def _evaluate_expression(
-    expression: str, language: str = "hscript", **_: Any
-) -> dict[str, Any]:
+def _evaluate_expression(expression: str, language: str = "hscript", **_: Any) -> dict[str, Any]:
     """Evaluate an expression and return its result.
 
     Supports both HScript expressions (via `hou.hscriptExpression()`)
@@ -177,7 +183,7 @@ register_handler("code.evaluate_expression", _evaluate_expression)
 
 def _get_env_variable(var_name: str, **_: Any) -> dict[str, Any]:
     """Get a Houdini environment variable."""
-    value = hou.getenv(var_name)
+    value = hou.getenv(as_text(var_name, "var_name"))
 
     return {
         "var_name": var_name,

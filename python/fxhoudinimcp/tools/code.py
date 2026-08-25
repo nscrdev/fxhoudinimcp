@@ -10,11 +10,10 @@ from __future__ import annotations
 from typing import Any
 
 # Third-party
-from mcp.server.fastmcp import Context
+from fxhoudinimcp._sdk import Context
 
 # Internal
-from fxhoudinimcp.server import mcp, _get_bridge
-
+from fxhoudinimcp.server import _get_bridge, mcp
 
 ###### code.execute_python
 
@@ -74,9 +73,7 @@ async def execute_hscript(ctx: Context, command: str) -> dict:
 
 
 @mcp.tool()
-async def evaluate_expression(
-    ctx: Context, expression: str, language: str = "hscript"
-) -> dict:
+async def evaluate_expression(ctx: Context, expression: str, language: str = "hscript") -> dict:
     """Evaluate an expression in Houdini and return its result.
 
     Args:

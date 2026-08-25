@@ -15,18 +15,38 @@ import hou
 # Internal
 from fxhoudinimcp_server.config import layout_if_enabled
 from fxhoudinimcp_server.dispatcher import register_handler
+from fxhoudinimcp_server.errors import readable_message
 
 logger = logging.getLogger(__name__)
 
 
 ###### Helpers
 
+
 def _get_cop_node(node_path: str) -> hou.Node:
-    """Return a COP node or raise if not found."""
+    """Return a COP node, or say why the given node is not one.
+
+    This checked only existence despite its name, so every cops.* command trusted
+    it and answered about whatever it was handed. get_cop_info on a box SOP came
+    back success with category "Sop", x_resolution None and planes [] -- it knew
+    the node was not a COP and reported an image summary anyway. A caller reading
+    "x_resolution: None" has no way to tell a wrong node type from an image with no
+    resolution, which is worse than an error.
+    """
     node = hou.node(node_path)
     if node is None:
         raise ValueError(f"Node not found: {node_path}")
-    return node
+    category = node.type().category().name()
+    if category == "Cop":
+        return node
+    # A COP network container is accepted: some callers pass the copnet.
+    children = node.childTypeCategory()
+    if children is not None and children.name() == "Cop":
+        return node
+    raise ValueError(
+        f"{node_path} is a {category} node ({node.type().name()}), not a COP. "
+        f"COP tools work on nodes inside a copnet or /img."
+    )
 
 
 def _focus_network_editor(node: hou.Node) -> None:
@@ -47,6 +67,7 @@ def _focus_network_editor(node: hou.Node) -> None:
 
 
 ###### cops.get_cop_info
+
 
 def get_cop_info(node_path: str) -> dict:
     """Return information about a COP node.
@@ -121,6 +142,7 @@ def get_cop_info(node_path: str) -> dict:
 
 ###### cops.get_cop_geometry
 
+
 def get_cop_geometry(node_path: str, output_index: int = 0) -> dict:
     """Get geometry representation from a COP node.
 
@@ -136,9 +158,8 @@ def get_cop_geometry(node_path: str, output_index: int = 0) -> dict:
         geo = node.geometry(output_index)
     except Exception as e:
         raise ValueError(
-            f"Failed to get geometry from COP node {node_path} "
-            f"at output {output_index}: {e}"
-        )
+            f"Failed to get geometry from COP node {node_path} at output {output_index}: {readable_message(e)}"
+        ) from e
 
     if geo is None:
         return {
@@ -153,20 +174,28 @@ def get_cop_geometry(node_path: str, output_index: int = 0) -> dict:
         "node_path": node.path(),
         "output_index": output_index,
         "has_geometry": True,
-        "num_points": geo.intrinsicValue("pointcount") if geo.intrinsicValue("pointcount") is not None else len(geo.points()),
-        "num_prims": geo.intrinsicValue("primitivecount") if geo.intrinsicValue("primitivecount") is not None else len(geo.prims()),
-        "num_vertices": geo.intrinsicValue("vertexcount") if geo.intrinsicValue("vertexcount") is not None else len(geo.vertices()),
+        "num_points": geo.intrinsicValue("pointcount")
+        if geo.intrinsicValue("pointcount") is not None
+        else len(geo.points()),
+        "num_prims": geo.intrinsicValue("primitivecount")
+        if geo.intrinsicValue("primitivecount") is not None
+        else len(geo.prims()),
+        "num_vertices": geo.intrinsicValue("vertexcount")
+        if geo.intrinsicValue("vertexcount") is not None
+        else len(geo.vertices()),
     }
 
     # Point attributes
     try:
         point_attribs = []
         for attrib in geo.pointAttribs():
-            point_attribs.append({
-                "name": attrib.name(),
-                "type": str(attrib.dataType()),
-                "size": attrib.size(),
-            })
+            point_attribs.append(
+                {
+                    "name": attrib.name(),
+                    "type": str(attrib.dataType()),
+                    "size": attrib.size(),
+                }
+            )
         result["point_attributes"] = point_attribs
     except (hou.OperationFailed, AttributeError) as e:
         logger.debug("Could not read point attributes for '%s': %s", node_path, e)
@@ -176,11 +205,13 @@ def get_cop_geometry(node_path: str, output_index: int = 0) -> dict:
     try:
         prim_attribs = []
         for attrib in geo.primAttribs():
-            prim_attribs.append({
-                "name": attrib.name(),
-                "type": str(attrib.dataType()),
-                "size": attrib.size(),
-            })
+            prim_attribs.append(
+                {
+                    "name": attrib.name(),
+                    "type": str(attrib.dataType()),
+                    "size": attrib.size(),
+                }
+            )
         result["primitive_attributes"] = prim_attribs
     except (hou.OperationFailed, AttributeError) as e:
         logger.debug("Could not read primitive attributes for '%s': %s", node_path, e)
@@ -202,6 +233,7 @@ def get_cop_geometry(node_path: str, output_index: int = 0) -> dict:
 
 ###### cops.get_cop_layer
 
+
 def get_cop_layer(node_path: str, output_index: int = 0) -> dict:
     """Get image layer data information from a COP node.
 
@@ -222,11 +254,13 @@ def get_cop_layer(node_path: str, output_index: int = 0) -> dict:
         layer_info = []
         for plane in planes:
             components = node.components(plane)
-            layer_info.append({
-                "plane_name": plane,
-                "components": list(components) if components else [],
-                "depth": str(node.planeDepth(plane)) if hasattr(node, "planeDepth") else None,
-            })
+            layer_info.append(
+                {
+                    "plane_name": plane,
+                    "components": list(components) if components else [],
+                    "depth": str(node.planeDepth(plane)) if hasattr(node, "planeDepth") else None,
+                }
+            )
         result["layers"] = layer_info
         result["layer_count"] = len(layer_info)
     except AttributeError:
@@ -259,6 +293,7 @@ def get_cop_layer(node_path: str, output_index: int = 0) -> dict:
 
 ###### cops.create_cop_node
 
+
 def create_cop_node(
     parent_path: str,
     cop_type: str,
@@ -276,15 +311,11 @@ def create_cop_node(
         raise ValueError(f"Parent node not found: {parent_path}")
 
     try:
-        if name:
-            node = parent.createNode(cop_type, name)
-        else:
-            node = parent.createNode(cop_type)
+        node = parent.createNode(cop_type, name) if name else parent.createNode(cop_type)
     except hou.OperationFailed as e:
         raise ValueError(
-            f"Failed to create COP node of type '{cop_type}' "
-            f"under {parent_path}: {e}"
-        )
+            f"Failed to create COP node of type '{cop_type}' under {parent_path}: {readable_message(e)}"
+        ) from e
 
     _focus_network_editor(node)
 
@@ -297,6 +328,7 @@ def create_cop_node(
 
 
 ###### cops.set_cop_flags
+
 
 def set_cop_flags(
     node_path: str,
@@ -346,6 +378,7 @@ def set_cop_flags(
 
 ###### cops.list_cop_node_types
 
+
 def list_cop_node_types(filter: str = None) -> dict:
     """List available COP node types.
 
@@ -393,6 +426,7 @@ def list_cop_node_types(filter: str = None) -> dict:
 
 ###### cops.get_cop_vdb
 
+
 def get_cop_vdb(node_path: str, output_index: int = 0) -> dict:
     """Get VDB data information from a COP node.
 
@@ -408,9 +442,8 @@ def get_cop_vdb(node_path: str, output_index: int = 0) -> dict:
         geo = node.geometry(output_index)
     except Exception as e:
         raise ValueError(
-            f"Failed to get geometry from COP node {node_path} "
-            f"at output {output_index}: {e}"
-        )
+            f"Failed to get geometry from COP node {node_path} at output {output_index}: {readable_message(e)}"
+        ) from e
 
     if geo is None:
         return {
@@ -426,7 +459,9 @@ def get_cop_vdb(node_path: str, output_index: int = 0) -> dict:
         for prim in geo.prims():
             if prim.type() == hou.primType.VDB:
                 vdb_info = {
-                    "name": prim.attribValue("name") if prim.attribValue("name") else f"vdb_{prim.number()}",
+                    "name": prim.attribValue("name")
+                    if prim.attribValue("name")
+                    else f"vdb_{prim.number()}",
                     "prim_index": prim.number(),
                     "type": str(prim.type()),
                 }
@@ -455,7 +490,9 @@ def get_cop_vdb(node_path: str, output_index: int = 0) -> dict:
                     logger.debug("Could not read VDB bounding box: %s", e)
                     vdb_info["bounding_box"] = None
                 try:
-                    vdb_info["transform"] = [list(row) for row in prim.transform().asTupleOfTuples()]
+                    vdb_info["transform"] = [
+                        list(row) for row in prim.transform().asTupleOfTuples()
+                    ]
                 except (hou.OperationFailed, AttributeError) as e:
                     logger.debug("Could not read VDB transform: %s", e)
                     vdb_info["transform"] = None

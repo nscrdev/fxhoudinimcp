@@ -7,13 +7,13 @@ via the HTTP bridge.
 from __future__ import annotations
 
 # Built-in
-from typing import Any, Optional
+from typing import Any
 
 # Third-party
-from mcp.server.fastmcp import Context
+from fxhoudinimcp._sdk import Context
 
 # Internal
-from fxhoudinimcp.server import mcp, _get_bridge
+from fxhoudinimcp.server import _get_bridge, mcp
 
 
 @mcp.tool()
@@ -57,7 +57,7 @@ async def get_cache_status(ctx: Context, node_path: str) -> dict:
 async def clear_cache(
     ctx: Context,
     node_path: str,
-    frame_range: Optional[list[int]] = None,
+    frame_range: list[int] | None = None,
 ) -> dict:
     """Delete cached files on disk for a cache node.
 
@@ -77,9 +77,14 @@ async def clear_cache(
 async def write_cache(
     ctx: Context,
     node_path: str,
-    frame_range: Optional[list[int]] = None,
+    frame_range: list[int] | None = None,
 ) -> dict:
-    """Execute a cache node to write files to disk.
+    """Execute a cache node, and report whether a cache actually appeared.
+
+    `success` and `wrote_files` reflect the files on disk and the errors of the
+    node that did the writing -- a filecache delegates to an internal ROP and
+    stays silent itself, so a failed write used to be reported as success.
+    Errors are named with the node they came from.
 
     Args:
         ctx: MCP context.

@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mainMenu>
+  <menuBar>
+    <subMenu id="fxhoudinimcp_menu">
+      <label>MCP</label>
+      <insertBefore>help_menu</insertBefore>
+
+      <scriptItem id="fxhoudinimcp_start">
+        <label>Start Server</label>
+        <scriptCode><![CDATA[
+import hou
+import fxhoudinimcp_server.startup as mcp
+
+if mcp.is_running():
+    hou.ui.setStatusMessage(
+        f"FXHoudini-MCP already running on port {mcp.get_port()}"
+    )
+else:
+    try:
+        mcp.start()
+    except Exception as exc:
+        hou.ui.displayMessage(
+            f"Could not start the FXHoudini-MCP server:\n\n{exc}",
+            severity=hou.severityType.Error,
+            title="FXHoudini-MCP",
+        )
+    else:
+        hou.ui.setStatusMessage(
+            f"FXHoudini-MCP started on port {mcp.get_port()}"
+        )
+]]></scriptCode>
+      </scriptItem>
+
+      <scriptItem id="fxhoudinimcp_stop">
+        <label>Stop Server</label>
+        <scriptCode><![CDATA[
+import hou
+import fxhoudinimcp_server.startup as mcp
+
+if mcp.is_running():
+    mcp.stop()
+    hou.ui.setStatusMessage("FXHoudini-MCP stopped")
+else:
+    hou.ui.setStatusMessage("FXHoudini-MCP is not running")
+]]></scriptCode>
+      </scriptItem>
+
+      <separatorItem/>
+
+      <scriptItem id="fxhoudinimcp_connect">
+        <label>Connect a Client...</label>
+        <scriptCode><![CDATA[
+import hou
+import fxhoudinimcp_server.startup as mcp
+
+# The port the server actually ended up on, which is not always the configured
+# one: a second Houdini moves itself to the next free port. Reporting the
+# configured port here would describe the wrong session.
+port = mcp.get_port()
+
+# What to recommend, and what to put on the clipboard.
+#
+# NOT the raw `claude mcp add ... python -m fxhoudinimcp`. From inside Houdini,
+# sys.executable is Houdini's own interpreter, not the external Python that has
+# fxhoudinimcp installed, and this side cannot find that one. So a hand-written
+# command here can only say a bare "python", which is the documented cause of a
+# client reporting "disconnected": clients start their servers without the
+# user's shell environment, so the name resolves against a PATH that may not
+# contain the right Python. Worse, pasting it over a working registration would
+# replace a correct absolute path with that bare name.
+#
+# `fxhoudinimcp install --client-only` runs in the right interpreter, so
+# sys.executable *is* the answer there. --client-only skips the Houdini half,
+# which means it needs no packages directory and cannot be made ambiguous.
+recommended = "python -m fxhoudinimcp install --client-only"
+
+summary = [f"This Houdini session serves MCP on port {port}."]
+
+if not mcp.is_running():
+    summary += [
+        "",
+        "The server is NOT running yet. Use MCP > Start Server first, or a",
+        "client will have nothing to connect to.",
+    ]
+elif port != 8100:
+    summary += [
+        "",
+        f"Note it is on {port}, not the default 8100, because another Houdini",
+        "was already serving.",
+    ]
+
+summary += [
+    "",
+    "Houdini is only one half. The other half is a small Python program your",
+    "MCP client starts, which relays between the client and this session.",
+    "Registering it is a one-off, in a terminal, not in Houdini:",
+    "",
+    f"    {recommended}",
+    "",
+    "See below for what that does and how to do it by hand.",
+]
+
+details = [
+    "WHAT NEEDS TO HAPPEN",
+    "",
+    "Your MCP client (Claude Code, Claude Desktop) needs to be told how to",
+    "start the fxhoudinimcp server. That server then talks to this Houdini",
+    "session over http://127.0.0.1 on the port above. You only do this once",
+    "per machine, not once per Houdini launch.",
+    "",
+    "",
+    "THE EASY WAY",
+    "",
+    "In a terminal (PowerShell, cmd, bash), not in Houdini's Python shell:",
+    "",
+    f"    {recommended}",
+    "",
+    "What it does:",
+    "  - finds Claude Code and Claude Desktop, whichever you have",
+    "  - writes the absolute path of the Python you ran it with into their",
+    "    config, so the client can always find it",
+    "  - changes nothing about Houdini (--client-only)",
+    "",
+    "Add --dry-run to see exactly which files it would touch first.",
+    "",
+    "Why 'python -m fxhoudinimcp install' and not just 'fxhoudinimcp install':",
+    "both work, but the first is self-correcting. Whichever Python you run it",
+    "with is the one that gets registered, so if the command runs at all, the",
+    "path it writes is correct by construction.",
+    "",
+    "If it says 'No module named fxhoudinimcp', that Python does not have it.",
+    "Install it there with:  python -m pip install fxhoudinimcp",
+    "",
+    "",
+    "THE MANUAL WAY, for Claude Code",
+    "",
+    "    claude mcp add --scope user fxhoudini -- python -m fxhoudinimcp",
+    "",
+    "IMPORTANT: replace that 'python' with the FULL path to the Python that has",
+    "fxhoudinimcp installed. Here the client resolves the name itself, and it",
+    "is started without your shell environment, so a bare 'python' may not be",
+    "found or may be the wrong one. The only symptom is the client reporting",
+    "'disconnected', with nothing explaining why. Get the right path with:",
+    "",
+    "    python -c \"import sys; print(sys.executable)\"",
+    "",
+    "Already registered and want to repoint it? There is no in-place update:",
+    "",
+    "    claude mcp remove fxhoudini -s user",
+    f"    {recommended}",
+]
+
+if port != 8100:
+    details += [
+        "",
+        "",
+        f"ABOUT PORT {port}",
+        "",
+        f"This session moved to {port} because another Houdini already held 8100.",
+        "The client scans 8100-8115 and takes the lowest that answers, so it will",
+        "find a session on its own. To reach THIS one specifically, set",
+        f"HOUDINI_PORT={port} in the client's environment, keeping in mind that",
+        "pinning it switches the scan off.",
+    ]
+
+try:
+    hou.ui.copyTextToClipboard(recommended)
+    summary += ["", "(Copied to your clipboard.)"]
+except Exception:
+    # Deliberately broad. There is no clipboard on a headless or remote display,
+    # and the exact exception is not worth guessing: failing to copy must never
+    # stop the commands being shown, which is the part that matters. They are
+    # selectable in the details pane either way.
+    pass
+
+hou.ui.displayMessage(
+    "\n".join(summary),
+    title="FXHoudini-MCP: Connect a Client",
+    details="\n".join(details),
+    details_label="Show commands",
+    # Expanded, because the whole point is to copy text out of it. The details
+    # pane is a selectable text area, so this is what makes the commands
+    # copyable rather than just readable.
+    details_expanded=True,
+)
+]]></scriptCode>
+      </scriptItem>
+
+      <separatorItem/>
+
+      <scriptItem id="fxhoudinimcp_status">
+        <label>Server Status...</label>
+        <scriptCode><![CDATA[
+import os
+
+import hou
+import fxhoudinimcp_server.startup as mcp
+
+if mcp.is_running():
+    lines = [
+        f"Status: RUNNING on port {mcp.get_port()}",
+        f"Bind address: {os.environ.get('FXHOUDINIMCP_BIND', '127.0.0.1')}",
+    ]
+elif mcp.is_starting():
+    # Auto-start confirms readiness on a worker thread, so there is a window
+    # where the server is neither stopped nor confirmed running.
+    lines = [
+        f"Status: STARTING on port {mcp.get_port()}",
+        "Auto-start is still confirming the server answers.",
+    ]
+else:
+    lines = [
+        "Status: STOPPED",
+        f"Configured port: {mcp.get_port()}",
+        "",
+        "Use MCP > Start Server, or set FXHOUDINIMCP_AUTOSTART=1",
+    ]
+
+lines.append(f"Houdini pid: {os.getpid()}")
+hou.ui.displayMessage("\n".join(lines), title="FXHoudini-MCP Status")
+]]></scriptCode>
+      </scriptItem>
+    </subMenu>
+  </menuBar>
+</mainMenu>

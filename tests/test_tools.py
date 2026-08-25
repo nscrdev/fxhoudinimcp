@@ -4,6 +4,7 @@ from __future__ import annotations
 
 # Third-party
 import pytest
+from support import tool_input_schema
 
 # Internal
 from fxhoudinimcp.errors import ConnectionError as HoudiniConnectionError
@@ -29,7 +30,7 @@ class TestSceneTools:
     @pytest.mark.asyncio
     async def test_new_scene(self, mock_ctx, mock_bridge):
         mock_bridge.execute.return_value = {"created": True}
-        result = await new_scene(mock_ctx, save_current=True)
+        await new_scene(mock_ctx, save_current=True)
         mock_bridge.execute.assert_called_once_with("scene.new_scene", {"save_current": True})
 
     @pytest.mark.asyncio
@@ -42,6 +43,54 @@ class TestSceneTools:
             "base_url": "http://localhost:8100",
             "health": {"status": "ok", "pid": 123},
         }
+
+    @pytest.mark.asyncio
+    async def test_connection_status_backfills_hip_file(self, mock_ctx, mock_bridge):
+        """mcp.health is HOM-free, so hip_file comes from the scene handler.
+
+        Callers read health["hip_file"], so the key has to keep appearing even
+        though the health endpoint no longer knows it.
+        """
+        mock_bridge.base_url = "http://localhost:8100"
+        mock_bridge.health_check.return_value = {"status": "ok", "pid": 123}
+        mock_bridge.execute.return_value = {
+            "hip_file": "/tmp/shot.hip",
+            "houdini_version": "22.0.368",
+        }
+
+        result = await get_houdini_connection_status(mock_ctx)
+
+        assert result["connected"] is True
+        assert result["health"]["hip_file"] == "/tmp/shot.hip"
+        assert result["health"]["houdini_version"] == "22.0.368"
+        assert result["health"]["pid"] == 123
+
+    @pytest.mark.asyncio
+    async def test_connection_status_survives_scene_lookup_failure(self, mock_ctx, mock_bridge):
+        """A busy or wedged Houdini must not stop this reporting connected."""
+        mock_bridge.base_url = "http://localhost:8100"
+        mock_bridge.health_check.return_value = {"status": "ok", "pid": 123}
+        mock_bridge.execute.side_effect = HoudiniConnectionError("timed out")
+
+        result = await get_houdini_connection_status(mock_ctx)
+
+        assert result["connected"] is True
+        assert result["health"] == {"status": "ok", "pid": 123}
+
+    @pytest.mark.asyncio
+    async def test_connection_status_keeps_health_hip_file(self, mock_ctx, mock_bridge):
+        """An older plugin still reporting hip_file must not be second-guessed."""
+        mock_bridge.base_url = "http://localhost:8100"
+        mock_bridge.health_check.return_value = {
+            "status": "ok",
+            "pid": 123,
+            "hip_file": "/from/health.hip",
+        }
+
+        result = await get_houdini_connection_status(mock_ctx)
+
+        assert result["health"]["hip_file"] == "/from/health.hip"
+        mock_bridge.execute.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_connection_status_disconnect(self, mock_ctx, mock_bridge):
@@ -60,7 +109,7 @@ class TestNodeTools:
     @pytest.mark.asyncio
     async def test_create_node_required_params(self, mock_ctx, mock_bridge):
         mock_bridge.execute.return_value = {"path": "/obj/geo1/box1"}
-        result = await create_node(mock_ctx, parent_path="/obj/geo1", node_type="box")
+        await create_node(mock_ctx, parent_path="/obj/geo1", node_type="box")
         mock_bridge.execute.assert_called_once_with(
             "nodes.create_node",
             {"parent_path": "/obj/geo1", "node_type": "box"},
@@ -116,7 +165,7 @@ class TestCodeTools:
 
         tools = {t.name: t for t in await mcp.list_tools()}
         for tool_name in ("execute_python", "create_wrangle"):
-            schema = tools[tool_name].inputSchema
+            schema = tool_input_schema(tools[tool_name])
             assert "justification" in schema["required"], (
                 f"{tool_name} must require a justification"
             )
@@ -145,4 +194,89 @@ class TestMaterialTools:
         mock_bridge.execute.assert_called_once_with(
             "materials.list_materials",
             {"root_path": "/mat"},
+        )
+
+
+class TestEvidenceTools:
+    """Tools added because a recorded session reached for execute_python 13 times.
+
+    Six of those calls were stepping a sequential solver, three were naming
+    multiparm instance parameters, two were volume statistics, and the rest were
+    attribute aggregates and bulk parameter reads.
+    """
+
+    @pytest.mark.asyncio
+    async def test_cook_frame_range_omits_unset_optionals(self, mock_ctx, mock_bridge):
+        from fxhoudinimcp.tools.graph import cook_frame_range
+
+        mock_bridge.execute.return_value = {"frames_cooked": 0}
+        await cook_frame_range(mock_ctx, node_path="/obj/geo1/sim")
+        # start and end default to the playbar on the Houdini side, so sending
+        # nulls would override that with nothing.
+        mock_bridge.execute.assert_called_once_with(
+            "graph.cook_frame_range",
+            {"node_path": "/obj/geo1/sim", "step": 1.0, "volumes": False},
+        )
+
+    @pytest.mark.asyncio
+    async def test_cook_frame_range_forwards_everything_given(self, mock_ctx, mock_bridge):
+        from fxhoudinimcp.tools.graph import cook_frame_range
+
+        mock_bridge.execute.return_value = {"frames_cooked": 5}
+        await cook_frame_range(
+            mock_ctx,
+            node_path="/obj/geo1/sim",
+            start=1,
+            end=5,
+            step=1.0,
+            attribs=["heat"],
+            volumes=True,
+        )
+        mock_bridge.execute.assert_called_once_with(
+            "graph.cook_frame_range",
+            {
+                "node_path": "/obj/geo1/sim",
+                "step": 1.0,
+                "volumes": True,
+                "start": 1,
+                "end": 5,
+                "attribs": ["heat"],
+            },
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_attrib_stats(self, mock_ctx, mock_bridge):
+        from fxhoudinimcp.tools.geometry import get_attrib_stats
+
+        mock_bridge.execute.return_value = {"stats": {}}
+        await get_attrib_stats(mock_ctx, node_path="/obj/geo1/out", attribs=["fuel"])
+        mock_bridge.execute.assert_called_once_with(
+            "geometry.get_attrib_stats",
+            {"node_path": "/obj/geo1/out", "attrib_class": "point", "attribs": ["fuel"]},
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_volume_info(self, mock_ctx, mock_bridge):
+        from fxhoudinimcp.tools.geometry import get_volume_info
+
+        mock_bridge.execute.return_value = {"volume_count": 2}
+        await get_volume_info(mock_ctx, node_path="/obj/geo1/pyro")
+        mock_bridge.execute.assert_called_once_with(
+            "geometry.get_volume_info",
+            {"node_path": "/obj/geo1/pyro", "max_volumes": 24},
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_parameters(self, mock_ctx, mock_bridge):
+        from fxhoudinimcp.tools.parameters import get_parameters
+
+        mock_bridge.execute.return_value = {"parameters": {}}
+        await get_parameters(mock_ctx, node_path="/obj/geo1/pyro", patterns=["flame", "wind"])
+        mock_bridge.execute.assert_called_once_with(
+            "parameters.get_parameters",
+            {
+                "node_path": "/obj/geo1/pyro",
+                "include_defaults": False,
+                "patterns": ["flame", "wind"],
+            },
         )

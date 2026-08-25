@@ -24,9 +24,10 @@ from fxhoudinimcp.tools.nodes import layout_children  # noqa: E402
 
 
 class TestAutoLayoutFlag:
-    def test_default_enabled(self, monkeypatch):
+    def test_default_disabled(self, monkeypatch):
+        # This fork disables auto-layout by default to preserve manual layouts.
         monkeypatch.delenv("FXHOUDINIMCP_AUTO_LAYOUT", raising=False)
-        assert auto_layout_enabled() is True
+        assert auto_layout_enabled() is False
 
     @pytest.mark.parametrize("value", ["0", "false", "OFF", " no "])
     def test_disabled_values(self, monkeypatch, value):
@@ -41,20 +42,20 @@ class TestAutoLayoutFlag:
 
 class TestLayoutGuidance:
     def test_instructions_promote_layout_when_enabled(self, monkeypatch):
-        monkeypatch.delenv("FXHOUDINIMCP_AUTO_LAYOUT", raising=False)
-        text = load_markdown("server_instructions.md")
+        monkeypatch.setenv("FXHOUDINIMCP_AUTO_LAYOUT", "1")
+        text = load_markdown("instructions/server_instructions.md")
         assert "Call layout_children frequently" in text
 
     def test_instructions_forbid_layout_when_disabled(self, monkeypatch):
         monkeypatch.setenv("FXHOUDINIMCP_AUTO_LAYOUT", "0")
-        text = load_markdown("server_instructions.md")
+        text = load_markdown("instructions/server_instructions.md")
         assert "NEVER call layout_children" in text
         assert "Call layout_children frequently" not in text
 
     def test_housekeeping_block_follows_toggle(self, monkeypatch):
         monkeypatch.setenv("FXHOUDINIMCP_AUTO_LAYOUT", "0")
         text = load_markdown(
-            "procedural_modeling.md",
+            "workflows/model.md",
             description="a rock",
             output_context="/obj",
         )
@@ -71,7 +72,7 @@ class TestLayoutChildrenTool:
 
     @pytest.mark.asyncio
     async def test_executes_when_enabled(self, monkeypatch, mock_ctx, mock_bridge):
-        monkeypatch.delenv("FXHOUDINIMCP_AUTO_LAYOUT", raising=False)
+        monkeypatch.setenv("FXHOUDINIMCP_AUTO_LAYOUT", "1")
         await layout_children(mock_ctx, parent_path="/obj/geo1")
         mock_bridge.execute.assert_called_once_with(
             "nodes.layout_children", {"parent_path": "/obj/geo1"}
@@ -85,14 +86,21 @@ class TestHoudiniSideConfig:
         houdini_config.layout_if_enabled(node)
         node.layoutChildren.assert_not_called()
 
-    def test_layout_if_enabled_lays_out_by_default(self, monkeypatch):
+    def test_layout_if_enabled_skips_by_default(self, monkeypatch):
+        # This fork disables auto-layout by default to preserve manual layouts.
         monkeypatch.setattr(houdini_config.hou, "getenv", lambda name: None)
         monkeypatch.delenv("FXHOUDINIMCP_AUTO_LAYOUT", raising=False)
+        node = MagicMock()
+        houdini_config.layout_if_enabled(node)
+        node.layoutChildren.assert_not_called()
+
+    def test_layout_if_enabled_lays_out_when_opted_in(self, monkeypatch):
+        monkeypatch.setattr(houdini_config.hou, "getenv", lambda name: "1")
         node = MagicMock()
         houdini_config.layout_if_enabled(node)
         node.layoutChildren.assert_called_once()
 
     def test_process_env_fallback(self, monkeypatch):
         monkeypatch.setattr(houdini_config.hou, "getenv", lambda name: None)
-        monkeypatch.setenv("FXHOUDINIMCP_AUTO_LAYOUT", "0")
-        assert houdini_config.auto_layout_enabled() is False
+        monkeypatch.setenv("FXHOUDINIMCP_AUTO_LAYOUT", "1")
+        assert houdini_config.auto_layout_enabled() is True

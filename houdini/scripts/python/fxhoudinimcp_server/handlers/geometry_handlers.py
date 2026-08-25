@@ -7,7 +7,7 @@ All functions run on the main thread via the dispatcher.
 from __future__ import annotations
 
 # Built-in
-import math
+import contextlib
 import random
 from typing import Any
 
@@ -17,8 +17,8 @@ import hou
 # Internal
 from fxhoudinimcp_server.dispatcher import register_handler
 
-
 ###### Helpers
+
 
 def _get_sop_geo(node_path: str) -> hou.Geometry:
     """Return the cooked read-only geometry for a SOP node.
@@ -37,13 +37,12 @@ def _get_sop_geo(node_path: str) -> hou.Geometry:
 
 def _vec_to_list(v: Any) -> Any:
     """Convert hou.Vector2/3/4, hou.Color, etc. to a plain list."""
-    if isinstance(v, (hou.Vector2, hou.Vector3, hou.Vector4,
-                       hou.Quaternion, hou.Color)):
+    if isinstance(v, (hou.Vector2, hou.Vector3, hou.Vector4, hou.Quaternion, hou.Color)):
         return list(v)
     if isinstance(v, hou.Matrix3):
-        return [list(v.at(r, c) for c in range(3)) for r in range(3)]
+        return [[v.at(r, c) for c in range(3)] for r in range(3)]
     if isinstance(v, hou.Matrix4):
-        return [list(v.at(r, c) for c in range(4)) for r in range(4)]
+        return [[v.at(r, c) for c in range(4)] for r in range(4)]
     return v
 
 
@@ -68,12 +67,14 @@ def _attrib_class_obj(geo: hou.Geometry, attrib_class: str) -> Any:
     }
     cls = mapping.get(attrib_class.lower())
     if cls is None:
-        raise ValueError(f"Invalid attrib_class: {attrib_class!r}. "
-                         f"Use one of {list(mapping.keys())}")
+        raise ValueError(
+            f"Invalid attrib_class: {attrib_class!r}. Use one of {list(mapping.keys())}"
+        )
     return cls
 
 
 ###### geometry.get_geometry_info
+
 
 def _get_geometry_info(*, node_path: str) -> dict[str, Any]:
     """Return summary information about a SOP node's geometry."""
@@ -129,10 +130,12 @@ def _get_geometry_info(*, node_path: str) -> dict[str, Any]:
         result["prim_type_breakdown_note"] = prim_sample_note
     return result
 
+
 register_handler("geometry.get_geometry_info", _get_geometry_info)
 
 
 ###### geometry.get_points
+
 
 def _get_points(
     *,
@@ -171,11 +174,7 @@ def _get_points(
     for pt in page:
         row: dict[str, Any] = {"index": pt.number()}
         for attr_name in attributes:
-            row[attr_name] = (
-                _vec_to_list(pt.attribValue(attr_name))
-                if found[attr_name]
-                else None
-            )
+            row[attr_name] = _vec_to_list(pt.attribValue(attr_name)) if found[attr_name] else None
         rows.append(row)
 
     return {
@@ -187,10 +186,12 @@ def _get_points(
         "points": rows,
     }
 
+
 register_handler("geometry.get_points", _get_points)
 
 
 ###### geometry.get_prims
+
 
 def _get_prims(
     *,
@@ -246,10 +247,12 @@ def _get_prims(
         "prims": rows,
     }
 
+
 register_handler("geometry.get_prims", _get_prims)
 
 
 ###### geometry.get_attrib_values
+
 
 def _get_attrib_values(
     *,
@@ -271,32 +274,40 @@ def _get_attrib_values(
     if cls == "point":
         attrib = geo.findPointAttrib(attrib_name)
         if attrib is None:
-            raise hou.OperationFailed(
-                f"Point attribute '{attrib_name}' not found on {node_path}")
-        all_values = geo.pointFloatAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Float \
-            else geo.pointIntAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Int \
+            raise hou.OperationFailed(f"Point attribute '{attrib_name}' not found on {node_path}")
+        all_values = (
+            geo.pointFloatAttribValues(attrib_name)
+            if attrib.dataType() == hou.attribData.Float
+            else geo.pointIntAttribValues(attrib_name)
+            if attrib.dataType() == hou.attribData.Int
             else geo.pointStringAttribValues(attrib_name)
+        )
     elif cls == "prim":
         attrib = geo.findPrimAttrib(attrib_name)
         if attrib is None:
-            raise hou.OperationFailed(
-                f"Prim attribute '{attrib_name}' not found on {node_path}")
-        all_values = geo.primFloatAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Float \
-            else geo.primIntAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Int \
+            raise hou.OperationFailed(f"Prim attribute '{attrib_name}' not found on {node_path}")
+        all_values = (
+            geo.primFloatAttribValues(attrib_name)
+            if attrib.dataType() == hou.attribData.Float
+            else geo.primIntAttribValues(attrib_name)
+            if attrib.dataType() == hou.attribData.Int
             else geo.primStringAttribValues(attrib_name)
+        )
     elif cls == "vertex":
         attrib = geo.findVertexAttrib(attrib_name)
         if attrib is None:
-            raise hou.OperationFailed(
-                f"Vertex attribute '{attrib_name}' not found on {node_path}")
-        all_values = geo.vertexFloatAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Float \
-            else geo.vertexIntAttribValues(attrib_name) if attrib.dataType() == hou.attribData.Int \
+            raise hou.OperationFailed(f"Vertex attribute '{attrib_name}' not found on {node_path}")
+        all_values = (
+            geo.vertexFloatAttribValues(attrib_name)
+            if attrib.dataType() == hou.attribData.Float
+            else geo.vertexIntAttribValues(attrib_name)
+            if attrib.dataType() == hou.attribData.Int
             else geo.vertexStringAttribValues(attrib_name)
+        )
     elif cls in ("detail", "global"):
         attrib = geo.findGlobalAttrib(attrib_name)
         if attrib is None:
-            raise hou.OperationFailed(
-                f"Detail attribute '{attrib_name}' not found on {node_path}")
+            raise hou.OperationFailed(f"Detail attribute '{attrib_name}' not found on {node_path}")
         val = geo.attribValue(attrib_name)
         return {
             "node_path": node_path,
@@ -329,10 +340,12 @@ def _get_attrib_values(
         "values": page,
     }
 
+
 register_handler("geometry.get_attrib_values", _get_attrib_values)
 
 
 ###### geometry.set_detail_attrib
+
 
 def _set_detail_attrib(
     *,
@@ -394,10 +407,12 @@ def _set_detail_attrib(
         "success": True,
     }
 
+
 register_handler("geometry.set_detail_attrib", _set_detail_attrib)
 
 
 ###### geometry.get_groups
+
 
 def _get_groups(*, node_path: str) -> dict[str, Any]:
     """List all point/prim/edge groups with membership counts."""
@@ -410,32 +425,40 @@ def _get_groups(*, node_path: str) -> dict[str, Any]:
     }
 
     for grp in geo.pointGroups():
-        groups["point_groups"].append({
-            "name": grp.name(),
-            "count": len(grp.points()),
-        })
+        groups["point_groups"].append(
+            {
+                "name": grp.name(),
+                "count": len(grp.points()),
+            }
+        )
 
     for grp in geo.primGroups():
-        groups["prim_groups"].append({
-            "name": grp.name(),
-            "count": len(grp.prims()),
-        })
+        groups["prim_groups"].append(
+            {
+                "name": grp.name(),
+                "count": len(grp.prims()),
+            }
+        )
 
     for grp in geo.edgeGroups():
-        groups["edge_groups"].append({
-            "name": grp.name(),
-            "count": len(grp.edges()),
-        })
+        groups["edge_groups"].append(
+            {
+                "name": grp.name(),
+                "count": len(grp.edges()),
+            }
+        )
 
     return {
         "node_path": node_path,
         **groups,
     }
 
+
 register_handler("geometry.get_groups", _get_groups)
 
 
 ###### geometry.get_group_members
+
 
 def _get_group_members(
     *,
@@ -452,25 +475,20 @@ def _get_group_members(
     if gt == "point":
         grp = geo.findPointGroup(group_name)
         if grp is None:
-            raise hou.OperationFailed(
-                f"Point group '{group_name}' not found on {node_path}")
+            raise hou.OperationFailed(f"Point group '{group_name}' not found on {node_path}")
         all_indices = [pt.number() for pt in grp.points()]
     elif gt == "prim":
         grp = geo.findPrimGroup(group_name)
         if grp is None:
-            raise hou.OperationFailed(
-                f"Prim group '{group_name}' not found on {node_path}")
+            raise hou.OperationFailed(f"Prim group '{group_name}' not found on {node_path}")
         all_indices = [pr.number() for pr in grp.prims()]
     elif gt == "edge":
         grp = geo.findEdgeGroup(group_name)
         if grp is None:
-            raise hou.OperationFailed(
-                f"Edge group '{group_name}' not found on {node_path}")
-        all_indices = [[e.points()[0].number(), e.points()[1].number()]
-                       for e in grp.edges()]
+            raise hou.OperationFailed(f"Edge group '{group_name}' not found on {node_path}")
+        all_indices = [[e.points()[0].number(), e.points()[1].number()] for e in grp.edges()]
     else:
-        raise ValueError(f"Invalid group_type: {group_type!r}. "
-                         f"Use 'point', 'prim', or 'edge'.")
+        raise ValueError(f"Invalid group_type: {group_type!r}. Use 'point', 'prim', or 'edge'.")
 
     total = len(all_indices)
     end = min(start + max(1, count), total)
@@ -487,10 +505,12 @@ def _get_group_members(
         "members": page,
     }
 
+
 register_handler("geometry.get_group_members", _get_group_members)
 
 
 ###### geometry.get_bounding_box
+
 
 def _get_bounding_box(*, node_path: str) -> dict[str, Any]:
     """Get axis-aligned bounding box for a SOP node's geometry."""
@@ -505,10 +525,12 @@ def _get_bounding_box(*, node_path: str) -> dict[str, Any]:
         "center": list(bbox.center()),
     }
 
+
 register_handler("geometry.get_bounding_box", _get_bounding_box)
 
 
 ###### geometry.get_attribute_info
+
 
 def _get_attribute_info(
     *,
@@ -534,8 +556,8 @@ def _get_attribute_info(
     attrib = finder(attrib_name)
     if attrib is None:
         raise hou.OperationFailed(
-            f"{attrib_class.title()} attribute '{attrib_name}' "
-            f"not found on {node_path}")
+            f"{attrib_class.title()} attribute '{attrib_name}' not found on {node_path}"
+        )
 
     default = attrib.defaultValue()
 
@@ -551,10 +573,12 @@ def _get_attribute_info(
         "type_name": attrib.dataType().name(),
     }
 
+
 register_handler("geometry.get_attribute_info", _get_attribute_info)
 
 
 ###### geometry.sample_geometry
+
 
 def _sample_geometry(
     *,
@@ -586,10 +610,12 @@ def _sample_geometry(
         rng = random.Random(seed)
         step = total / actual_count
         # Start with evenly spaced, then jitter slightly for variety
-        sampled_indices = sorted(set(
-            min(int(i * step + rng.uniform(0, step * 0.5)), total - 1)
-            for i in range(actual_count)
-        ))
+        sampled_indices = sorted(
+            {
+                min(int(i * step + rng.uniform(0, step * 0.5)), total - 1)
+                for i in range(actual_count)
+            }
+        )
 
     # Gather attributes — indexed access keeps the cost O(sample_count)
     point_attrib_names = [a.name() for a in geo.pointAttribs()]
@@ -612,10 +638,12 @@ def _sample_geometry(
         "points": rows,
     }
 
+
 register_handler("geometry.sample_geometry", _sample_geometry)
 
 
 ###### geometry.get_prim_intrinsics
+
 
 def _get_prim_intrinsics(
     *,
@@ -633,8 +661,8 @@ def _get_prim_intrinsics(
     if prim_index is not None:
         if prim_index < 0 or prim_index >= total_prims:
             raise hou.OperationFailed(
-                f"Prim index {prim_index} out of range "
-                f"(0..{total_prims - 1}) on {node_path}")
+                f"Prim index {prim_index} out of range (0..{total_prims - 1}) on {node_path}"
+            )
         prim = geo.prim(prim_index)
         intrinsic_names = prim.intrinsicNames()
         intrinsics: dict[str, Any] = {}
@@ -665,12 +693,8 @@ def _get_prim_intrinsics(
         sample_note = None
     else:
         step = total_prims / _SUMMARY_SAMPLE_LIMIT
-        sample_prims = [
-            geo.prim(int(i * step)) for i in range(_SUMMARY_SAMPLE_LIMIT)
-        ]
-        sample_note = (
-            f"statistics sampled from {_SUMMARY_SAMPLE_LIMIT}/{total_prims} prims"
-        )
+        sample_prims = [geo.prim(int(i * step)) for i in range(_SUMMARY_SAMPLE_LIMIT)]
+        sample_note = f"statistics sampled from {_SUMMARY_SAMPLE_LIMIT}/{total_prims} prims"
 
     sample_prim = sample_prims[0]
     intrinsic_names = sample_prim.intrinsicNames()
@@ -716,10 +740,12 @@ def _get_prim_intrinsics(
         result["summary_note"] = sample_note
     return result
 
+
 register_handler("geometry.get_prim_intrinsics", _get_prim_intrinsics)
 
 
 ###### geometry.find_nearest_point
+
 
 def _find_nearest_point(
     *,
@@ -768,11 +794,13 @@ def _find_nearest_point(
 
     results: list[dict[str, Any]] = []
     for dist, idx in top:
-        results.append({
-            "index": idx,
-            "position": list(flat[idx * 3 : idx * 3 + 3]),
-            "distance": dist,
-        })
+        results.append(
+            {
+                "index": idx,
+                "position": list(flat[idx * 3 : idx * 3 + 3]),
+                "distance": dist,
+            }
+        )
 
     return {
         "node_path": node_path,
@@ -781,4 +809,203 @@ def _find_nearest_point(
         "results": results,
     }
 
+
 register_handler("geometry.find_nearest_point", _find_nearest_point)
+
+
+###### geometry.get_attrib_stats
+
+
+_STATS_ATTRIB_CAP = 12
+
+
+def _numeric_components(values: Any) -> list[float]:
+    """Flatten a scalar, vector or tuple attribute value to floats."""
+    if isinstance(values, (int, float)):
+        return [float(values)]
+    try:
+        return [float(v) for v in values]
+    except (TypeError, ValueError):
+        return []
+
+
+def _get_attrib_stats(
+    *,
+    node_path: str,
+    attribs: list[str] | str | None = None,
+    attrib_class: str = "point",
+) -> dict[str, Any]:
+    """Aggregate statistics for numeric attributes: min, max, mean, sum.
+
+    get_geometry_info names the attributes and get_attrib_values returns every
+    value, which on a 62k-point cache is unusable in a conversation. Proving a
+    simulation is doing something needs the aggregate, not the values, and that
+    is otherwise only reachable through execute_python.
+    """
+    geo = _get_sop_geo(node_path)
+
+    cls = attrib_class.lower()
+    listers = {
+        "point": (geo.pointAttribs, geo.points),
+        "prim": (geo.primAttribs, geo.prims),
+        "vertex": (geo.vertexAttribs, None),
+        "detail": (geo.globalAttribs, None),
+        "global": (geo.globalAttribs, None),
+    }
+    if cls not in listers:
+        raise ValueError(f"Invalid attrib_class: {attrib_class!r}")
+    lister, element_getter = listers[cls]
+
+    if isinstance(attribs, str):
+        attribs = [attribs]
+    available = {a.name(): a for a in lister()}
+    wanted = attribs or sorted(available)
+
+    missing = [name for name in wanted if name not in available]
+    wanted = [name for name in wanted if name in available][:_STATS_ATTRIB_CAP]
+
+    if cls in ("detail", "global"):
+        # A detail attribute is a single value, so "statistics" is the value.
+        stats = {name: {"value": _vec_to_list(geo.attribValue(available[name]))} for name in wanted}
+        return {
+            "node_path": node_path,
+            "attrib_class": attrib_class,
+            "element_count": 1,
+            "stats": stats,
+            "missing": missing,
+        }
+
+    if element_getter is None:
+        raise ValueError(
+            f"attrib_class {attrib_class!r} has no per-element statistics; "
+            "use point, prim or detail"
+        )
+
+    elements = element_getter()
+    stats: dict[str, Any] = {}
+    for name in wanted:
+        attrib = available[name]
+        if attrib.isArrayType() or attrib.dataType() == hou.attribData.String:
+            stats[name] = {"skipped": "not numeric"}
+            continue
+        # attribValues() is a single C++ call for the whole array, where a Python
+        # loop over 62k elements would be thousands of times slower.
+        try:
+            flat = list(geo.pointFloatAttribValues(name)) if cls == "point" else None
+        except (AttributeError, hou.OperationFailed):
+            flat = None
+        if flat is None:
+            flat = []
+            for element in elements:
+                flat.extend(_numeric_components(element.attribValue(attrib)))
+        if not flat:
+            stats[name] = {"count": 0}
+            continue
+        size = attrib.size()
+        entry: dict[str, Any] = {
+            "count": len(elements),
+            "size": size,
+            "min": min(flat),
+            "max": max(flat),
+            "sum": sum(flat),
+            "mean": sum(flat) / len(flat),
+        }
+        if size > 1:
+            # Per-component ranges, because a velocity field's interesting number
+            # is usually the per-axis extreme rather than the flattened one.
+            entry["per_component"] = [
+                {
+                    "min": min(flat[i::size]),
+                    "max": max(flat[i::size]),
+                    "mean": sum(flat[i::size]) / len(flat[i::size]),
+                }
+                for i in range(size)
+            ]
+        stats[name] = entry
+
+    return {
+        "node_path": node_path,
+        "attrib_class": attrib_class,
+        "element_count": len(elements),
+        "stats": stats,
+        "missing": missing,
+        "truncated": bool(attribs is None and len(available) > _STATS_ATTRIB_CAP),
+    }
+
+
+register_handler("geometry.get_attrib_stats", _get_attrib_stats)
+
+
+###### geometry.get_volume_info
+
+
+# Volume statistics come from intrinsics, which is the only route that works for
+# both types: hou.VDB has activeVoxelCount() but no minValue()/maxValue(), and
+# hou.Volume has neither. The intrinsics below are present on both.
+#
+# NEVER read the "voxeldata" intrinsic here: it returns every voxel value, so on
+# a real sim field it is millions of floats through the bridge. The whole point
+# of this handler is to answer the question without moving the data.
+_VOLUME_INTRINSICS = (
+    ("min_value", "volumeminvalue"),
+    ("max_value", "volumemaxvalue"),
+    ("mean_value", "volumeavgvalue"),
+    ("active_voxels", "activevoxelcount"),
+    ("voxel_size", "voxelsize"),
+)
+
+
+def _volume_entry(prim: Any) -> dict[str, Any]:
+    """Name, resolution, voxel counts and value range for one volume prim."""
+    entry: dict[str, Any] = {"prim_number": prim.number(), "kind": type(prim).__name__}
+    with contextlib.suppress(Exception):
+        entry["name"] = prim.attribValue("name")
+    with contextlib.suppress(Exception):
+        entry["resolution"] = list(prim.resolution())
+
+    available = set()
+    with contextlib.suppress(Exception):
+        available = set(prim.intrinsicNames())
+    for key, intrinsic in _VOLUME_INTRINSICS:
+        if intrinsic not in available:
+            continue
+        with contextlib.suppress(Exception):
+            value = prim.intrinsicValue(intrinsic)
+            entry[key] = list(value) if isinstance(value, tuple) else value
+
+    # A dense volume has no active-voxel concept, so report the grid total under
+    # its own name rather than pretending the two numbers mean the same thing.
+    if "active_voxels" not in entry and entry.get("resolution"):
+        res = entry["resolution"]
+        entry["total_voxels"] = res[0] * res[1] * res[2]
+
+    with contextlib.suppress(Exception):
+        bbox = prim.boundingBox()
+        entry["bbox_min"] = list(bbox.minvec())
+        entry["bbox_max"] = list(bbox.maxvec())
+    return entry
+
+
+def _get_volume_info(*, node_path: str, max_volumes: int = 24) -> dict[str, Any]:
+    """Per-volume names, resolution, active voxels and value ranges.
+
+    get_geometry_info reports a primitive count, which cannot distinguish a
+    correctly named non-empty density field from an empty one. get_cop_vdb
+    covers Copernicus; this is the SOP side of the same question.
+    """
+    geo = _get_sop_geo(node_path)
+    volumes = [
+        prim
+        for prim in geo.prims()
+        if isinstance(prim, (hou.Volume, hou.VDB)) or type(prim).__name__ in ("Volume", "VDB")
+    ]
+    shown = volumes[:max_volumes]
+    return {
+        "node_path": node_path,
+        "volume_count": len(volumes),
+        "volumes": [_volume_entry(prim) for prim in shown],
+        "truncated": len(volumes) > len(shown),
+    }
+
+
+register_handler("geometry.get_volume_info", _get_volume_info)

@@ -1,0 +1,441 @@
+"""Generate the whole node-domain section of server_instructions.md.
+
+Every node name advertised to the assistant is derived here. Nothing in that
+section is hand-written, so there is no half-curated, half-generated boundary for
+a reader to guess at.
+
+    python tools/gen_node_domains.py            # regenerate
+    python tools/gen_node_domains.py --check    # fail if stale
+
+Version markers are written here, from tools/node_versions.json, so one run
+leaves a correct file. This script used to emit bare names and depend on
+tools/gen_node_versions.py running afterwards to add them, which meant running
+it alone quietly stripped every marker and told 20.5 users about 22.0-only
+nodes. Run gen_node_versions.py to contribute a build to that table; it is no
+longer a required second step here.
+
+Sources, and why each:
+
+* SideFX's shipped node help (``nodes.zip``) decides which names appear. It is
+  the only signal available for "ships with Houdini": the installed node lists
+  include whatever plugins are on the generating machine, and advertising one
+  studio's Redshift or Octane nodes to every user would manufacture exactly the
+  hallucinations this section exists to prevent. Verified: redshift:: and
+  octane_ are absent from the help.
+* ``#tags`` supply the grouping where SideFX populated them, which in practice
+  means SOPs and DOPs. Elsewhere they are near-empty (3 tagged VOPs out of 1257,
+  0 COPs, 0 SHOPs), so those contexts fall back to name stems usable as a
+  ``filter=`` value, then to a flat list of names.
+* ``tools/node_versions.json`` decides what exists at all, from the builds
+  contributors have sampled.
+
+Known limitation, stated in the generated text as well: the help documents 3974
+nodes against 5566 installed on a full 22.0 install, so real stock nodes SideFX
+never documented (surfacedeform, deflate, wrinkledeformer) are absent. The lists
+are a floor, not an inventory, which is why the generated preamble points at
+list_node_types and search_help.
+"""
+
+from __future__ import annotations
+
+# Built-in
+import argparse
+import json
+import re
+import sys
+import zipfile
+from collections import Counter, defaultdict
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+# Annotate while emitting, rather than leaving it to a second script. See
+# _annotator below for why.
+from gen_node_versions import annotation_for, availability  # noqa: E402
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+_INSTRUCTIONS = (
+    REPO_ROOT
+    / "python"
+    / "fxhoudinimcp"
+    / "prompts"
+    / "markdown"
+    / "instructions"
+    / "server_instructions.md"
+)
+_TABLE = Path(__file__).resolve().parent / "node_versions.json"
+
+_BEGIN = "<!-- BEGIN GENERATED: node domains -->"
+_END = "<!-- END GENERATED: node domains -->"
+
+# SideFX's help #context values mapped to hou node type categories, enumerated
+# from the help rather than guessed: "obj" and "out" do not capitalise into
+# "Object" and "Driver", which silently produced zero coverage for both.
+_HELP_CONTEXT_TO_CATEGORY = {
+    "sop": "Sop",
+    "vop": "Vop",
+    "dop": "Dop",
+    "lop": "Lop",
+    "cop": "Cop",
+    "cop2": "Cop2",
+    "chop": "Chop",
+    "top": "Top",
+    "shop": "Shop",
+    "obj": "Object",
+    "out": "Driver",
+}
+
+# The context= argument the tools take, where it differs from the category name.
+_CONTEXT_ARG = {"Object": "Obj"}
+
+_MIN_TYPES = 25
+_MIN_TAG_MEMBERS = 4
+_MIN_TAGS_TO_GROUP = 4
+_MAX_TAGS = 20
+_MAX_TAG_NAMES = 16
+_MIN_STEM_MEMBERS = 3
+_MAX_STEMS = 10
+_MAX_STEM_EXAMPLES = 16
+_MAX_FLAT_NAMES = 48
+_STEM_LEN = 6
+
+# SideFX aligns these header values, so the amount of whitespace after the colon
+# varies between pages ("#type: node" and "#type:     node" both occur). Matching
+# the literal string silently skipped 829 of 4780 node pages, including
+# lop/copytopoints, which is why this is a regex.
+_TYPE_NODE = re.compile(r"^#type:\s*node\s*$", re.M)
+_INTERNAL = re.compile(r"^#internal:\s*(\S+)", re.M)
+_CONTEXT = re.compile(r"^#context:\s*(\S+)", re.M)
+_TAGS = re.compile(r"^#tags:\s*(.+)$", re.M)
+
+# Only emit names test_instruction_accuracy_live can claim, so nothing is
+# advertised without being verified. Internal capitals are allowed because
+# MaterialX types are spelled mtlxLamaAdd; a lowercase first character is what
+# keeps prose out of the claim set.
+_VERIFIABLE = re.compile(r"[a-z][A-Za-z0-9_:.]*[A-Za-z0-9]$")
+
+
+def _verifiable(name: str) -> bool:
+    return bool(_VERIFIABLE.match(name)) and ("_" in name or "::" in name or len(name) >= 4)
+
+
+def read_help(
+    help_zip: Path,
+) -> tuple[dict[str, set[str]], dict[str, dict[str, set[str]]]]:
+    """Return (category -> documented names, category -> tag -> names)."""
+    documented: dict[str, set[str]] = defaultdict(set)
+    tagged: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+
+    with zipfile.ZipFile(help_zip) as archive:
+        for entry in archive.namelist():
+            if not entry.endswith(".txt"):
+                continue
+            text = archive.read(entry).decode("utf-8", "replace")
+            if not _TYPE_NODE.search(text):
+                continue
+            internal, context = _INTERNAL.search(text), _CONTEXT.search(text)
+            if not (internal and context):
+                continue
+            category = _HELP_CONTEXT_TO_CATEGORY.get(context.group(1))
+            if not category:
+                continue
+            name = internal.group(1)
+            documented[category].add(name)
+            tags = _TAGS.search(text)
+            if tags:
+                for tag in (part.strip() for part in tags.group(1).split(",")):
+                    if tag:
+                        tagged[category][tag].add(name)
+    return documented, tagged
+
+
+def existing_names(table: dict) -> set[str]:
+    """ "Category/name" keys any sampled build reported.
+
+    Deliberately "any", not "every": a name that exists in only part of the range
+    still belongs here, and tools/gen_node_versions.py marks it with a version
+    range afterwards. Requiring presence everywhere would silently drop
+    instancer, pointinstancer and layout, which are precisely the cases the
+    version markers exist for.
+    """
+    return set(table["present"])
+
+
+def _annotator(category, series, per_series):
+    """Return name -> "name (21.0+)" for one node category.
+
+    Annotating here rather than in a second pass is the point. This script used
+    to emit bare names and rely on tools/gen_node_versions.py being run
+    afterwards to add the markers, so running it alone silently stripped every
+    one of them: the names stayed correct while a 20.5 user was told about
+    22.0-only nodes. It also meant --check could never pass, because the
+    committed file never matched this script's own output.
+    """
+
+    def annotate(name: str) -> str:
+        per = per_series.get(f"{category}/{name}")
+        if per is None:
+            return name
+        mark = annotation_for(per, series)
+        return f"{name} {mark}" if mark else name
+
+    return annotate
+
+
+def _identity(name: str) -> str:
+    return name
+
+
+def _tag_lines(
+    names: list[str], tagged: dict[str, set[str]], annotate=_identity
+) -> list[str] | None:
+    available = set(names)
+    groups = {tag: sorted(members & available) for tag, members in tagged.items()}
+    groups = {tag: found for tag, found in groups.items() if len(found) >= _MIN_TAG_MEMBERS}
+    if len(groups) < _MIN_TAGS_TO_GROUP:
+        return None
+
+    lines = []
+    for tag, found in sorted(groups.items(), key=lambda kv: -len(kv[1]))[:_MAX_TAGS]:
+        shown = found[:_MAX_TAG_NAMES]
+        suffix = ", etc." if len(found) > len(shown) else ""
+        lines.append(f"*   {tag}: {', '.join(annotate(n) for n in shown)}{suffix}")
+    return lines
+
+
+def _stem_line(names: list[str], annotate=_identity) -> str | None:
+    members: dict[str, list[str]] = defaultdict(list)
+    for name in names:
+        match = re.match(r"[a-z]{3,}", name.split("::")[0])
+        if match:
+            members[match.group(0)[:_STEM_LEN]].append(name)
+
+    counted = Counter({stem: len(found) for stem, found in members.items()})
+    top = [stem for stem, count in counted.most_common(_MAX_STEMS) if count >= _MIN_STEM_MEMBERS]
+    if not top:
+        return None
+    filters = "|".join(f"'{stem}'" for stem in top)
+    # Prefer a mixed-case member when the family has one: MaterialX types are
+    # spelled mtlxLamaAdd, and always taking the alphabetically first name hid
+    # that spelling from both the assistant and the verifier.
+    examples = []
+    for stem in top[:_MAX_STEM_EXAMPLES]:
+        family = sorted(members[stem])
+        mixed = next((n for n in family if any(c.isupper() for c in n)), None)
+        examples.append(mixed or family[0])
+    # The leading label matters: test_instruction_accuracy_live reads names from
+    # after the first ":" on a bullet, so a colon-less line advertises names it
+    # never verifies. That silently left Vop, Cop, Cop2, Chop and Shop unchecked.
+    shown = [annotate(name) for name in examples]
+    return f"*   Name prefixes: filter={filters} — e.g. {', '.join(shown)}"
+
+
+def _newest_build(table: dict) -> str | None:
+    if not table.get("builds"):
+        return None
+    return max(table["builds"], key=lambda b: tuple(int(x) for x in b.split(".")))
+
+
+def deprecated_names(table: dict) -> set[str]:
+    """ "Category/name" the newest sampled build marks deprecated.
+
+    Advertising these is a workflow regression, and it was happening: 29 of 605
+    advertised names were superseded nodes, among them Sop/group (groupcreate
+    replaced it), Sop/copy (copytopoints), Sop/point (attribexpression) and
+    Dop/smokeobject (smokeobject_sparse). hou.NodeType.deprecated is
+    authoritative, where reading it out of release notes would not be.
+    """
+    newest = _newest_build(table)
+    if newest is None:
+        return set()
+    return set((table.get("deprecated") or {}).get(newest) or [])
+
+
+def renames(table: dict) -> dict[str, str]:
+    """Old name -> current name, for renames inside the sampled range.
+
+    From hou.NodeType.aliases(), which Houdini keeps so old scene files still
+    load, making it the authoritative rename map rather than something inferred.
+    Limited to old names a sampled build actually had and the newest no longer
+    has: the full alias list reaches back years, and most of it is irrelevant to
+    a model working on a supported version.
+
+    SideFX renamed the Instancer LOP to Copy to Points and the Layout LOP to
+    Paint Instances in 22.0. Without this the assistant only learns that the old
+    names stopped existing, not what to reach for instead.
+    """
+    newest = _newest_build(table)
+    if newest is None:
+        return {}
+    aliases = (table.get("aliases") or {}).get(newest) or {}
+    in_newest = {key for key, builds in table["present"].items() if newest in builds}
+    ever = set(table["present"])
+    return {
+        old: new
+        for old, new in sorted(aliases.items())
+        if old in ever and old not in in_newest and new in in_newest
+    }
+
+
+def build_block(
+    documented: dict[str, set[str]],
+    tagged: dict[str, dict[str, set[str]]],
+    existing: set[str],
+    deprecated: set[str] | None = None,
+    renamed: dict[str, str] | None = None,
+    series: list[str] | None = None,
+    per_series: dict[str, dict[str, bool]] | None = None,
+) -> str:
+    # No series means no evidence to date names against, so emit them bare
+    # rather than silently claiming they exist everywhere.
+    series = series or []
+    per_series = per_series or {}
+    lines = [
+        "Generated by `tools/gen_node_domains.py` from Houdini's own shipped node",
+        "help. Do not hand-edit.",
+        "",
+        "These lists are a floor, not an inventory: SideFX documents fewer nodes",
+        "than ship, and a plugin your studio installs is never listed. Call",
+        "`list_node_types(context, filter)` to see what is actually loaded, and",
+        "`search_help(query)` to find a node by what it does rather than by name.",
+        "",
+        "A name followed by a version range exists only in those Houdini versions,",
+        "within the 20.5-22.0 range this server supports: `colorcorrect (21.0+)` is",
+        "absent before 21.0, and `instancer (20.5-21.0)` is gone from 22.0 onward.",
+        "Unannotated names exist throughout. Check `get_scene_info` for the running",
+        "version before relying on an annotated name.",
+    ]
+
+    deprecated = deprecated or set()
+
+    def stock(category: str) -> list[str]:
+        return sorted(
+            name
+            for name in documented[category]
+            if f"{category}/{name}" in existing
+            and f"{category}/{name}" not in deprecated
+            and _verifiable(name)
+        )
+
+    for category in sorted(documented, key=lambda c: -len(stock(c))):
+        names = stock(category)
+        if len(names) < _MIN_TYPES:
+            continue
+
+        context = _CONTEXT_ARG.get(category, category)
+        lines.append("")
+        lines.append(f"### {category} (context='{context}', {len(names)} documented)")
+        lines.append("")
+
+        annotate = _annotator(category, series, per_series)
+        grouped = _tag_lines(names, tagged.get(category, {}), annotate)
+        if grouped:
+            lines.extend(grouped)
+            continue
+
+        stem = _stem_line(names, annotate)
+        if stem:
+            lines.append(stem)
+            continue
+
+        shown = names[:_MAX_FLAT_NAMES]
+        suffix = ", etc." if len(names) > len(shown) else ""
+        lines.append(f"*   Types: {', '.join(annotate(n) for n in shown)}{suffix}")
+
+    if renamed:
+        lines.append("")
+        lines.append("### Renamed nodes")
+        lines.append("")
+        lines.append("The old name still works when creating a node, because Houdini keeps")
+        lines.append("the alias so old scenes load, but prefer the current name:")
+        for old_key, new_key in sorted(renamed.items()):
+            category, _, old_name = old_key.partition("/")
+            new_name = new_key.partition("/")[2]
+            annotate = _annotator(category, series, per_series)
+            lines.append(f"*   {category}: {annotate(old_name)} is now {annotate(new_name)}")
+
+    return "\n".join(lines)
+
+
+def _newest_help_zip() -> Path | None:
+    sys.path.insert(0, str(REPO_ROOT / "tests"))
+    from run_integration import find_all_hython  # noqa: E402
+
+    for hython in find_all_hython():
+        # Walk up rather than index a fixed depth: the interpreter is at
+        # <install>/bin on Windows and Linux but six levels into the framework
+        # bundle on macOS.
+        for parent in hython.parents:
+            candidate = parent / "houdini" / "help" / "nodes.zip"
+            if candidate.is_file():
+                return candidate
+    return None
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="fail if stale")
+    args = parser.parse_args()
+
+    help_zip = _newest_help_zip()
+    if help_zip is None:
+        print("No Houdini node help found; cannot tell stock nodes from plugins.")
+        return 1
+    if not _TABLE.is_file():
+        print(f"{_TABLE.relative_to(REPO_ROOT)} is missing. Run tools/gen_node_versions.py first.")
+        return 1
+
+    table = json.loads(_TABLE.read_text(encoding="utf-8"))
+    documented, tagged = read_help(help_zip)
+    existing = existing_names(table)
+    deprecated = deprecated_names(table)
+    renamed = {
+        old: new
+        for old, new in renames(table).items()
+        # Keep the map to nodes SideFX documents, matching the lists above, so a
+        # plugin-only rename is not advertised to users without that plugin.
+        if new.split("/", 1)[1] in documented.get(new.split("/", 1)[0], set())
+    }
+    series, per_series = availability(table)
+    block = build_block(documented, tagged, existing, deprecated, renamed, series, per_series)
+
+    text = _INSTRUCTIONS.read_text(encoding="utf-8")
+    if _BEGIN not in text or _END not in text:
+        print(
+            f"Markers missing from {_INSTRUCTIONS.relative_to(REPO_ROOT)}.\n"
+            f"    {_BEGIN}\n    {_END}"
+        )
+        return 1
+
+    start = text.index(_BEGIN) + len(_BEGIN)
+    end = text.index(_END)
+    updated = text[:start] + "\n" + block + "\n" + text[end:]
+
+    print(f"help source : {help_zip}")
+    print(f"contexts    : {block.count(chr(10) + '### ')}")
+    print(f"block size  : {len(block)} bytes")
+
+    # Exact comparison, because the block written here now carries its own
+    # version markers. While a second script added them, an exact compare
+    # reported STALE permanently and a marker-insensitive one could not notice an
+    # annotation going missing. Generating them here buys back both.
+    if args.check:
+        if updated != text:
+            print(
+                f"\nSTALE: {_INSTRUCTIONS.relative_to(REPO_ROOT)}\n"
+                "Run: python tools/gen_node_domains.py"
+            )
+            return 1
+        print("\nUp to date.")
+        return 0
+
+    if updated != text:
+        _INSTRUCTIONS.write_text(updated, encoding="utf-8")
+        print(f"\nrewrote {_INSTRUCTIONS.relative_to(REPO_ROOT)}")
+    else:
+        print(f"\n{_INSTRUCTIONS.relative_to(REPO_ROOT)} already correct")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

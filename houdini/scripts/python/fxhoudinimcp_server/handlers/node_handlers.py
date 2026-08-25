@@ -7,6 +7,7 @@ nodes within Houdini's node graph.
 from __future__ import annotations
 
 # Built-in
+import contextlib
 import re
 
 # Third-party
@@ -15,9 +16,11 @@ import hou
 # Internal
 from fxhoudinimcp_server.config import auto_layout_enabled, layout_if_enabled
 from fxhoudinimcp_server.dispatcher import register_handler
-
+from fxhoudinimcp_server.errors import readable_message
+from fxhoudinimcp_server.serialize import to_jsonable
 
 ###### Helpers
+
 
 def _get_node(node_path: str) -> hou.Node:
     """Resolve a node path and raise a clear error if it does not exist."""
@@ -56,6 +59,7 @@ def _focus_network_editor(node: hou.Node) -> None:
 
 ###### nodes.create_node
 
+
 def create_node(
     parent_path: str,
     node_type: str,
@@ -76,8 +80,8 @@ def create_node(
         node = parent.createNode(node_type, node_name=name)
     except hou.OperationFailed as e:
         raise ValueError(
-            f"Failed to create node of type '{node_type}' inside '{parent_path}': {e}"
-        )
+            f"Failed to create node of type '{node_type}' inside '{parent_path}': {readable_message(e)}"
+        ) from e
 
     if position is not None and len(position) >= 2:
         node.setPosition(hou.Vector2(position[0], position[1]))
@@ -94,6 +98,7 @@ def create_node(
 
 
 ###### nodes.delete_node
+
 
 def delete_node(node_path: str) -> dict:
     """Delete a node from the scene.
@@ -115,6 +120,7 @@ def delete_node(node_path: str) -> dict:
 
 
 ###### nodes.rename_node
+
 
 def rename_node(node_path: str, new_name: str) -> dict:
     """Rename an existing node.
@@ -1028,6 +1034,7 @@ class _BulkRenameError(Exception):
 
 ###### nodes.copy_node
 
+
 def copy_node(
     node_path: str,
     dest_parent: str = None,
@@ -1058,6 +1065,7 @@ def copy_node(
 
 ###### nodes.move_node
 
+
 def move_node(node_path: str, dest_parent: str) -> dict:
     """Move a node to a different parent network.
 
@@ -1079,6 +1087,7 @@ def move_node(node_path: str, dest_parent: str) -> dict:
 
 
 ###### nodes.get_node_info
+
 
 def get_node_info(node_path: str) -> dict:
     """Return comprehensive information about a node.
@@ -1107,58 +1116,60 @@ def get_node_info(node_path: str) -> dict:
                 default = default[0]
         except Exception:
             default = None
-        if val == default:
-            continue
-        parms_summary.append({
-            "name": parm.name(),
-            "label": parm.description(),
-            "value": val if not isinstance(val, (hou.Vector2, hou.Vector3, hou.Vector4)) else list(val),
-            "default": default if not isinstance(default, tuple) else list(default),
-            "type": parm.parmTemplate().type().name(),
-        })
+        # Ramp and Data parameters have no comparable defaultValue(), so this
+        # guard never filters them out and they always reach the response --
+        # which is why they have to survive JSON encoding (see serialize.py).
+        try:
+            if val == default:
+                continue
+        except Exception:
+            pass
+        parms_summary.append(
+            {
+                "name": parm.name(),
+                "label": parm.description(),
+                "value": to_jsonable(val),
+                "default": to_jsonable(default),
+                "type": parm.parmTemplate().type().name(),
+            }
+        )
 
     # Inputs
     inputs = []
     for i, conn in enumerate(node.inputs()):
         if conn is not None:
-            inputs.append({
-                "index": i,
-                "node_path": conn.path(),
-                "node_name": conn.name(),
-            })
+            inputs.append(
+                {
+                    "index": i,
+                    "node_path": conn.path(),
+                    "node_name": conn.name(),
+                }
+            )
         else:
             inputs.append({"index": i, "node_path": None, "node_name": None})
 
     # Outputs
     outputs = []
     for conn in node.outputs():
-        outputs.append({
-            "node_path": conn.path(),
-            "node_name": conn.name(),
-        })
+        outputs.append(
+            {
+                "node_path": conn.path(),
+                "node_name": conn.name(),
+            }
+        )
 
     # Flags
     flags = {}
-    try:
+    with contextlib.suppress(Exception):
         flags["display"] = node.isDisplayFlagSet()
-    except Exception:
-        pass
-    try:
+    with contextlib.suppress(Exception):
         flags["render"] = node.isRenderFlagSet()
-    except Exception:
-        pass
-    try:
+    with contextlib.suppress(Exception):
         flags["bypass"] = node.isBypassed()
-    except Exception:
-        pass
-    try:
+    with contextlib.suppress(Exception):
         flags["template"] = node.isTemplateFlagSet()
-    except Exception:
-        pass
-    try:
+    with contextlib.suppress(Exception):
         flags["lock"] = node.isHardLocked()
-    except Exception:
-        pass
 
     # Errors and warnings
     try:
@@ -1205,6 +1216,7 @@ def get_node_info(node_path: str) -> dict:
 
 ###### nodes.list_children
 
+
 def list_children(
     parent_path: str,
     recursive: bool = False,
@@ -1219,10 +1231,7 @@ def list_children(
     """
     parent = _get_node(parent_path)
 
-    if recursive:
-        children = parent.allSubChildren()
-    else:
-        children = parent.children()
+    children = parent.allSubChildren() if recursive else parent.children()
 
     _MAX_CHILDREN = 500
     results = []
@@ -1242,6 +1251,7 @@ def list_children(
 
 
 ###### nodes.find_nodes
+
 
 def find_nodes(
     pattern: str = None,
@@ -1266,18 +1276,17 @@ def find_nodes(
         # Filter by name pattern
         if pattern is not None:
             import fnmatch
+
             if not fnmatch.fnmatch(node.name(), pattern):
                 continue
 
         # Filter by type
-        if node_type is not None:
-            if node.type().name() != node_type:
-                continue
+        if node_type is not None and node.type().name() != node_type:
+            continue
 
         # Filter by category/context
-        if context is not None:
-            if node.type().category().name() != context:
-                continue
+        if context is not None and node.type().category().name() != context:
+            continue
 
         results.append(_node_summary(node))
         if len(results) >= _MAX_RESULTS:
@@ -1291,6 +1300,7 @@ def find_nodes(
 
 
 ###### nodes.list_node_types
+
 
 def list_node_types(
     context: str,
@@ -1312,8 +1322,7 @@ def list_node_types(
     if category is None:
         available = sorted(categories.keys())
         raise ValueError(
-            f"Unknown node type category: '{context}'. "
-            f"Available categories: {available}"
+            f"Unknown node type category: '{context}'. Available categories: {available}"
         )
 
     types_dict = category.nodeTypes()
@@ -1325,17 +1334,16 @@ def list_node_types(
                 continue
         except Exception:
             pass
-        type_list.append({
-            "name": type_name,
-            "label": node_type.description(),
-        })
+        type_list.append(
+            {
+                "name": type_name,
+                "label": node_type.description(),
+            }
+        )
 
     if filter:
         f = filter.lower()
-        type_list = [
-            t for t in type_list
-            if f in t["name"].lower() or f in t["label"].lower()
-        ]
+        type_list = [t for t in type_list if f in t["name"].lower() or f in t["label"].lower()]
 
     total = len(type_list)
     type_list = type_list[:limit]
@@ -1349,6 +1357,7 @@ def list_node_types(
 
 
 ###### nodes.connect_nodes
+
 
 def connect_nodes(
     source_path: str,
@@ -1382,6 +1391,7 @@ def connect_nodes(
 
 ###### nodes.connect_nodes_batch
 
+
 def connect_nodes_batch(
     connections: list,
 ) -> dict:
@@ -1405,18 +1415,22 @@ def connect_nodes_batch(
             dest = _get_node(dst_path)
             dest.setInput(in_idx, source, out_idx)
             last_dest = dest
-            results.append({
-                "source_path": source.path(),
-                "dest_path": dest.path(),
-                "output_index": out_idx,
-                "input_index": in_idx,
-            })
+            results.append(
+                {
+                    "source_path": source.path(),
+                    "dest_path": dest.path(),
+                    "output_index": out_idx,
+                    "input_index": in_idx,
+                }
+            )
         except Exception as exc:
-            errors.append({
-                "source_path": src_path,
-                "dest_path": dst_path,
-                "error": str(exc),
-            })
+            errors.append(
+                {
+                    "source_path": src_path,
+                    "dest_path": dst_path,
+                    "error": str(exc),
+                }
+            )
 
     if last_dest is not None:
         _focus_network_editor(last_dest)
@@ -1429,6 +1443,7 @@ def connect_nodes_batch(
 
 
 ###### nodes.disconnect_node
+
 
 def disconnect_node(
     node_path: str,
@@ -1472,6 +1487,7 @@ def disconnect_node(
 
 ###### nodes.reorder_inputs
 
+
 def reorder_inputs(node_path: str, new_order: list) -> dict:
     """Reorder the input connections of a node.
 
@@ -1506,6 +1522,7 @@ def reorder_inputs(node_path: str, new_order: list) -> dict:
 
 
 ###### nodes.set_node_flags
+
 
 def set_node_flags(
     node_path: str,
@@ -1581,6 +1598,7 @@ def set_node_flags(
 
 ###### nodes.layout_children
 
+
 def layout_children(parent_path: str, spacing: float = None) -> dict:
     """Auto-layout the children of a network node.
 
@@ -1613,6 +1631,7 @@ def layout_children(parent_path: str, spacing: float = None) -> dict:
 
 ###### nodes.set_node_position
 
+
 def set_node_position(node_path: str, x: float, y: float) -> dict:
     """Set the position of a node in the network editor.
 
@@ -1632,6 +1651,7 @@ def set_node_position(node_path: str, x: float, y: float) -> dict:
 
 
 ###### nodes.set_node_color
+
 
 def set_node_color(node_path: str, r: float, g: float, b: float) -> dict:
     """Set the color of a node in the network editor.

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 # Built-in
 import base64
+import contextlib
 import logging
 import os
 import tempfile
@@ -19,6 +20,7 @@ import hou
 
 # Internal
 from fxhoudinimcp_server.dispatcher import register_handler
+from fxhoudinimcp_server.ui import require_ui
 
 logger = logging.getLogger(__name__)
 
@@ -50,17 +52,19 @@ def _downscale_and_encode(file_path: str) -> tuple[str | None, str]:
     mime_type = "image/jpeg"
 
     try:
+        from PySide2.QtCore import QBuffer, QIODevice, Qt
         from PySide2.QtGui import QImage
-        from PySide2.QtCore import Qt, QBuffer, QIODevice
     except ImportError:
         try:
+            from PySide6.QtCore import QBuffer, QIODevice, Qt
             from PySide6.QtGui import QImage
-            from PySide6.QtCore import Qt, QBuffer, QIODevice
         except ImportError:
             # Qt not available — try Pillow before giving up.
             try:
-                from PIL import Image as PilImage
                 import io as _io
+
+                from PIL import Image as PilImage
+
                 with PilImage.open(file_path) as img:
                     img = img.convert("RGB")
                     w, h = img.size
@@ -78,9 +82,7 @@ def _downscale_and_encode(file_path: str) -> tuple[str | None, str]:
             except Exception:
                 pass
             # Cannot compress — skip the image rather than returning raw PNG.
-            logger.warning(
-                "Neither Qt nor Pillow available; skipping image for %s", file_path
-            )
+            logger.warning("Neither Qt nor Pillow available; skipping image for %s", file_path)
             return None, mime_type
 
     try:
@@ -92,8 +94,10 @@ def _downscale_and_encode(file_path: str) -> tuple[str | None, str]:
         w, h = img.width(), img.height()
         if w > _MAX_IMAGE_DIM or h > _MAX_IMAGE_DIM:
             img = img.scaled(
-                _MAX_IMAGE_DIM, _MAX_IMAGE_DIM,
-                Qt.KeepAspectRatio, Qt.SmoothTransformation,
+                _MAX_IMAGE_DIM,
+                _MAX_IMAGE_DIM,
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation,
             )
 
         # Encode to JPEG in-memory; if still too large, reduce quality.
@@ -165,10 +169,63 @@ def _capture_pane_tab_qt(pane_tab, output_path: str) -> None:
         )
 
 
+def _viewer_stage(scene_viewer):
+    """The USD stage a Solaris viewer is displaying, or None.
+
+    Tried in order because which of these is a LOP depends on what the user last
+    clicked: the current node, the network the viewer is in, and that network's
+    display node.
+    """
+    candidates = []
+    with contextlib.suppress(Exception):
+        candidates.append(scene_viewer.currentNode())
+    with contextlib.suppress(Exception):
+        candidates.append(scene_viewer.pwd())
+    with contextlib.suppress(Exception):
+        candidates.append(scene_viewer.pwd().displayNode())
+    for node in candidates:
+        if node is None or not hasattr(node, "stage"):
+            continue
+        with contextlib.suppress(Exception):
+            stage = node.stage()
+            if stage is not None:
+                return stage
+    return None
+
+
+def _camera_prims(stage, limit: int = 12) -> list[str]:
+    """Camera prim paths on a stage, for error messages worth reading."""
+    found: list[str] = []
+    with contextlib.suppress(Exception):
+        for prim in stage.Traverse():
+            if str(prim.GetTypeName()) == "Camera":
+                found.append(str(prim.GetPath()))
+                if len(found) >= limit:
+                    break
+    return found
+
+
+def _is_scene_graph_view(scene_viewer) -> bool:
+    """Whether Hydra delegates apply at all.
+
+    hydraRenderers() raises "Specified view is not a scene graph view" in an
+    object-level viewport, which is a different situation from a build that has
+    no such API, and reporting them the same way sent a caller looking for a
+    Houdini upgrade instead of a Solaris viewport.
+    """
+    try:
+        scene_viewer.hydraRenderers()
+    except Exception:
+        return False
+    return True
+
+
 ###### viewport.list_panes
+
 
 def list_panes() -> dict:
     """List all visible pane tabs, their types, and associated information."""
+    require_ui("list Houdini's panes")
     pane_tabs = hou.ui.paneTabs()
     panes = []
     for pt in pane_tabs:
@@ -201,6 +258,7 @@ def list_panes() -> dict:
 
 ###### viewport.get_viewport_info
 
+
 def get_viewport_info(pane_name: str = None) -> dict:
     """Get current viewport settings including camera, display mode, and view transform.
 
@@ -222,6 +280,36 @@ def get_viewport_info(pane_name: str = None) -> dict:
     except (hou.OperationFailed, hou.ObjectWasDeleted, AttributeError) as e:
         logger.debug("Could not read viewport camera: %s", e)
         info["camera"] = None
+
+    # camera() returns a hou.Node, so it is None for a USD camera prim even when
+    # the viewport is looking through one. cameraPath() answers for both, and
+    # without it there was no way to ask "what am I actually looking through".
+    info["camera_path"] = None
+    with contextlib.suppress(Exception):
+        info["camera_path"] = viewport.cameraPath() or None
+
+    # cameraPath() is an echo of whatever was last set, and Houdini will happily
+    # echo a path that does not exist. Repeating it unchecked would make this tool
+    # a second source of the same false confidence, so resolve it: as a node, or
+    # as a prim on the viewer's stage.
+    if info["camera_path"]:
+        resolved = hou.node(info["camera_path"]) is not None
+        if not resolved:
+            stage = _viewer_stage(scene_viewer)
+            if stage is not None:
+                with contextlib.suppress(Exception):
+                    prim = stage.GetPrimAtPath(info["camera_path"])
+                    resolved = bool(prim and prim.IsValid())
+        info["camera_path_resolves"] = resolved
+
+    # The active Hydra delegate. Nothing reported this before, so a viewport that
+    # had silently reverted to GL looked identical to one rendering in Karma
+    # until someone eyeballed a screenshot.
+    info["renderer"] = None
+    with contextlib.suppress(Exception):
+        info["renderer"] = scene_viewer.currentHydraRenderer()
+    with contextlib.suppress(Exception):
+        info["available_renderers"] = list(scene_viewer.hydraRenderers())
 
     # Display mode / shading
     try:
@@ -252,6 +340,7 @@ def get_viewport_info(pane_name: str = None) -> dict:
 
 ###### viewport.set_viewport_camera
 
+
 def set_viewport_camera(
     camera_path: str,
     pane_name: str = None,
@@ -262,23 +351,82 @@ def set_viewport_camera(
         camera_path: Path to the camera node (e.g. '/obj/cam1').
         pane_name: Optional pane tab name.
     """
-    cam_node = hou.node(camera_path)
-    if cam_node is None:
-        raise ValueError(f"Camera node not found: {camera_path}")
-
     scene_viewer = _find_scene_viewer(pane_name)
     viewport = scene_viewer.curViewport()
-    viewport.setCamera(cam_node)
+
+    # A USD camera prim is not a hou.node, so resolving through hou.node() alone
+    # made every Solaris shot unframeable: the tool raised "Camera node not
+    # found" for a path that is perfectly valid on the stage. A recorded session
+    # lost nine execute_python calls to this and still shipped the wrong framing.
+    cam_node = hou.node(camera_path)
+    if cam_node is not None:
+        viewport.setCamera(cam_node)
+        # camera() returns the node, so comparing it is real verification.
+        bound = None
+        with contextlib.suppress(Exception):
+            bound = viewport.camera()
+        if bound is None or bound.path() != cam_node.path():
+            raise RuntimeError(
+                f"Asked to look through '{camera_path}' but the viewport reports "
+                f"'{bound.path() if bound else None}'."
+            )
+        return {
+            "success": True,
+            "verified": True,
+            "camera_path": cam_node.path(),
+            "is_usd_prim": False,
+            "pane_name": scene_viewer.name(),
+            "viewport_name": viewport.name(),
+        }
+
+    # A USD camera prim is not a hou.node, so resolving through hou.node() alone
+    # made every Solaris shot unframeable. But cameraPath() cannot verify the
+    # result either: it is a pure echo, and setCamera("/cameras/does_not_exist")
+    # returns without error and leaves cameraPath() reporting that exact
+    # nonexistent path. Verification has to be a stage lookup.
+    stage = _viewer_stage(scene_viewer)
+    if stage is None:
+        raise ValueError(
+            f"'{camera_path}' is not a node, and this viewport has no USD stage "
+            f"to look it up on. A Solaris camera prim requires the viewer to be "
+            f"in a LOP network."
+        )
+    prim = stage.GetPrimAtPath(camera_path)
+    if prim is None or not prim.IsValid():
+        cameras = _camera_prims(stage)
+        raise ValueError(
+            f"No prim at '{camera_path}' on this stage."
+            + (f" Camera prims present: {cameras}" if cameras else " The stage has no cameras.")
+        )
+    type_name = str(prim.GetTypeName())
+    if type_name != "Camera":
+        raise ValueError(
+            f"'{camera_path}' is a {type_name or 'typeless'} prim, not a Camera. "
+            f"Camera prims present: {_camera_prims(stage)}"
+        )
+
+    viewport.setCamera(camera_path)
+    echoed = None
+    with contextlib.suppress(Exception):
+        echoed = viewport.cameraPath() or None
+    if echoed is not None and echoed.rstrip("/") != camera_path.rstrip("/"):
+        raise RuntimeError(
+            f"Asked to look through '{camera_path}' but the viewport is on '{echoed}'."
+        )
 
     return {
         "success": True,
-        "camera_path": cam_node.path(),
+        "verified": True,
+        "camera_path": camera_path,
+        "is_usd_prim": True,
+        "prim_type": type_name,
         "pane_name": scene_viewer.name(),
         "viewport_name": viewport.name(),
     }
 
 
 ###### viewport.set_viewport_display
+
 
 def set_viewport_display(
     display_mode: str,
@@ -307,8 +455,7 @@ def set_viewport_display(
     gl_mode = mode_map.get(display_mode.lower())
     if gl_mode is None:
         raise ValueError(
-            f"Unknown display mode: '{display_mode}'. "
-            f"Supported modes: {list(mode_map.keys())}"
+            f"Unknown display mode: '{display_mode}'. Supported modes: {list(mode_map.keys())}"
         )
 
     scene_viewer = _find_scene_viewer(pane_name)
@@ -326,6 +473,7 @@ def set_viewport_display(
 
 
 ###### viewport.set_viewport_direction
+
 
 def set_viewport_direction(
     direction: str,
@@ -351,8 +499,7 @@ def set_viewport_direction(
     view_type = direction_map.get(direction.lower())
     if view_type is None:
         raise ValueError(
-            f"Unknown direction '{direction}'. "
-            f"Supported: {list(direction_map.keys())}"
+            f"Unknown direction '{direction}'. Supported: {list(direction_map.keys())}"
         )
 
     scene_viewer = _find_scene_viewer(pane_name)
@@ -370,6 +517,7 @@ def set_viewport_direction(
 
 ###### viewport.set_viewport_renderer
 
+
 def set_viewport_renderer(
     renderer: str,
     pane_name: str = None,
@@ -385,109 +533,103 @@ def set_viewport_renderer(
         pane_name: Optional pane tab name.
     """
     scene_viewer = _find_scene_viewer(pane_name)
-
-    # Try the Houdini 20+ API first: curViewport().settings().setRenderer()
-    # Fall back to scene_viewer-level methods if they exist.
     viewport = scene_viewer.curViewport()
 
-    # Discover available renderers
-    available = []
-    matched_name = None
-
-    # Method 1: hou.GeometryViewportSettings (Houdini 20+)
-    try:
-        settings = viewport.settings()
-        if hasattr(settings, "rendererNames"):
-            available = list(settings.rendererNames())
-        elif hasattr(settings, "availableRenderers"):
-            available = list(settings.availableRenderers())
-    except Exception:
-        pass
-
-    # Method 2: hou.lop module renderer list
+    # hou.SceneViewer.hydraRenderers/setHydraRenderer/currentHydraRenderer is the
+    # documented pair for this. The previous implementation went through
+    # viewport.settings().setRenderer() with an hscript fallback and, crucially,
+    # never read the renderer back: it returned success whenever a setter did not
+    # raise. A recorded session spent nine execute_python calls discovering that
+    # the viewport was still on GL while this tool reported Karma, and every
+    # screenshot it verified against was therefore the wrong image.
+    available: list[str] = []
+    with contextlib.suppress(Exception):
+        available = list(scene_viewer.hydraRenderers())
     if not available:
-        try:
-            import hou.lop as lop_module
-            if hasattr(lop_module, "availableRenderers"):
-                available = list(lop_module.availableRenderers())
-        except Exception:
-            pass
+        with contextlib.suppress(Exception):
+            settings = viewport.settings()
+            if hasattr(settings, "rendererNames"):
+                available = list(settings.rendererNames())
 
-    # Method 3: hou.SceneViewer-level
-    if not available:
-        try:
-            if hasattr(scene_viewer, "availableRenderers"):
-                available = list(scene_viewer.availableRenderers())
-        except Exception:
-            pass
-
-    # Match the requested renderer (case-insensitive, partial match)
     target = renderer.strip().lower()
-    for name in available:
-        if name.lower() == target:
-            matched_name = name
-            break
+    matched_name = next((n for n in available if n.lower() == target), None)
     if matched_name is None:
-        for name in available:
-            if target in name.lower():
-                matched_name = name
-                break
-
+        matched_name = next((n for n in available if target in n.lower()), None)
     if matched_name is None and not available:
-        # No discovery method worked — try to set directly and let Houdini
-        # resolve (may fail, but gives a useful error)
         matched_name = renderer
-
     if matched_name is None:
-        raise ValueError(
-            f"Renderer '{renderer}' not found. "
-            f"Available renderers: {available}"
-        )
+        raise ValueError(f"Renderer '{renderer}' not found. Available renderers: {available}")
 
-    # Apply the renderer
-    applied = False
+    def _current() -> str | None:
+        with contextlib.suppress(Exception):
+            return scene_viewer.currentHydraRenderer()
+        return None
 
-    # Try viewport settings
-    try:
-        settings = viewport.settings()
-        if hasattr(settings, "setRenderer"):
-            settings.setRenderer(matched_name)
-            applied = True
-        elif hasattr(settings, "setDefaultRenderer"):
-            settings.setDefaultRenderer(matched_name)
-            applied = True
-    except Exception:
-        pass
-
-    # Try scene viewer level
-    if not applied:
+    before = _current()
+    attempts: list[str] = []
+    for label, apply in (
+        ("setHydraRenderer", lambda: scene_viewer.setHydraRenderer(matched_name)),
+        (
+            "settings.setRenderer",
+            lambda: viewport.settings().setRenderer(matched_name),
+        ),
+        (
+            "hscript viewdisplay",
+            lambda: hou.hscript(f'viewdisplay -R "{matched_name}" {viewport.name()}'),
+        ),
+    ):
         try:
-            if hasattr(scene_viewer, "setRenderer"):
-                scene_viewer.setRenderer(matched_name)
-                applied = True
-        except Exception:
-            pass
+            apply()
+        except Exception as exc:  # noqa: BLE001 - each route is best-effort
+            attempts.append(f"{label}: {type(exc).__name__}")
+            continue
+        attempts.append(f"{label}: no error")
+        if (_current() or "").lower() == matched_name.lower():
+            break
 
-    # Last resort: execute hscript or hou.hscript
-    if not applied:
-        try:
-            hou.hscript(
-                f'viewdisplay -R "{matched_name}" {viewport.name()}'
+    active = _current()
+    # The renderer Houdini reports is the answer. Anything else is a guess about
+    # whether a setter worked.
+    applied = active is not None and active.lower() == matched_name.lower()
+    if not applied and active is None:
+        if not _is_scene_graph_view(scene_viewer):
+            # Not a missing API: Hydra delegates only exist for a scene graph
+            # view, so this request is meaningless in an object-level viewport
+            # and saying "unverifiable" would hide a real mistake.
+            raise ValueError(
+                "This viewport is not a scene graph view, so it has no Hydra "
+                "delegate to set. Hydra renderers (Karma, Storm) apply to a "
+                "Solaris viewport: put the viewer in a LOP network first."
             )
-            applied = True
-        except Exception:
-            pass
-
+        # A scene graph view with no readback: state genuinely unknown, so say so
+        # rather than claiming the requested renderer is live.
+        return {
+            "success": True,
+            "verified": False,
+            "requested": matched_name,
+            "renderer": None,
+            "note": (
+                "This Houdini exposes no currentHydraRenderer(), so the active "
+                "renderer could not be confirmed. Capture a screenshot before "
+                "trusting the viewport."
+            ),
+            "available_renderers": available,
+            "attempts": attempts,
+            "pane_name": scene_viewer.name(),
+            "viewport_name": viewport.name(),
+        }
     if not applied:
         raise RuntimeError(
-            f"Could not set renderer to '{matched_name}'. "
-            f"This may require a newer Houdini version. "
+            f"Asked for renderer '{matched_name}' but the viewport is still on "
+            f"'{active}' (was '{before}'). Tried: {'; '.join(attempts)}. "
             f"Available renderers: {available}"
         )
 
     return {
         "success": True,
-        "renderer": matched_name,
+        "verified": True,
+        "renderer": active,
+        "previous_renderer": before,
         "available_renderers": available,
         "pane_name": scene_viewer.name(),
         "viewport_name": viewport.name(),
@@ -495,6 +637,7 @@ def set_viewport_renderer(
 
 
 ###### viewport.frame_selection
+
 
 def frame_selection(pane_name: str = None) -> dict:
     """Frame the current selection in the viewport.
@@ -516,6 +659,7 @@ def frame_selection(pane_name: str = None) -> dict:
 
 ###### viewport.frame_all
 
+
 def frame_all(pane_name: str = None) -> dict:
     """Frame all geometry in the viewport (home all).
 
@@ -536,6 +680,7 @@ def frame_all(pane_name: str = None) -> dict:
 
 ###### viewport.capture_screenshot
 
+
 def capture_screenshot(
     output_path: str = None,
     pane_name: str = None,
@@ -554,11 +699,8 @@ def capture_screenshot(
     if out_dir and not os.path.isdir(out_dir):
         os.makedirs(out_dir, exist_ok=True)
 
-    if pane_name is not None:
-        pane_tab = _find_pane_by_name(pane_name)
-    else:
-        # Default to first Scene Viewer
-        pane_tab = _find_scene_viewer()
+    # Named pane if asked for, otherwise the first Scene Viewer.
+    pane_tab = _find_pane_by_name(pane_name) if pane_name is not None else _find_scene_viewer()
 
     cur_frame = hou.frame()
 
@@ -572,6 +714,7 @@ def capture_screenshot(
 
         # Handle frame number that flipbook may insert
         from fxhoudinimcp_server.handlers.rendering_handlers import _find_flipbook_output
+
         actual_path = _find_flipbook_output(output_path, cur_frame)
     else:
         actual_path = output_path
@@ -595,6 +738,7 @@ def capture_screenshot(
 
 
 ###### viewport.capture_network_editor
+
 
 def capture_network_editor(
     output_path: str = None,
@@ -652,6 +796,7 @@ def capture_network_editor(
 
 ###### viewport.set_current_network
 
+
 def set_current_network(network_path: str) -> dict:
     """Navigate the network editor to a specific network path.
 
@@ -662,6 +807,10 @@ def set_current_network(network_path: str) -> dict:
     if node is None:
         raise ValueError(f"Network path not found: {network_path}")
 
+    require_ui(
+        "navigate the network editor",
+        alternative="Without a UI the network can still be read with list_children.",
+    )
     network_editor = None
     for pane_tab in hou.ui.paneTabs():
         if pane_tab.type() == hou.paneTabType.NetworkEditor:
@@ -731,6 +880,7 @@ def get_current_network_path() -> dict:
 
 ###### viewport.find_error_nodes
 
+
 def find_error_nodes(root_path: str = "/") -> dict:
     """Find all nodes with errors or warnings, recursively from a root path.
 
@@ -749,24 +899,28 @@ def find_error_nodes(root_path: str = "/") -> dict:
         try:
             errors = node.errors()
             if errors:
-                error_nodes.append({
-                    "path": node.path(),
-                    "name": node.name(),
-                    "type": node.type().name(),
-                    "errors": list(errors),
-                })
+                error_nodes.append(
+                    {
+                        "path": node.path(),
+                        "name": node.name(),
+                        "type": node.type().name(),
+                        "errors": list(errors),
+                    }
+                )
         except (hou.OperationFailed, hou.ObjectWasDeleted, AttributeError) as e:
             logger.debug("Could not read errors for node '%s': %s", node.path(), e)
 
         try:
             warnings = node.warnings()
             if warnings:
-                warning_nodes.append({
-                    "path": node.path(),
-                    "name": node.name(),
-                    "type": node.type().name(),
-                    "warnings": list(warnings),
-                })
+                warning_nodes.append(
+                    {
+                        "path": node.path(),
+                        "name": node.name(),
+                        "type": node.type().name(),
+                        "warnings": list(warnings),
+                    }
+                )
         except (hou.OperationFailed, hou.ObjectWasDeleted, AttributeError) as e:
             logger.debug("Could not read warnings for node '%s': %s", node.path(), e)
 
@@ -790,6 +944,7 @@ def find_error_nodes(root_path: str = "/") -> dict:
 
 ###### Helpers
 
+
 def _find_scene_viewer(pane_name: str = None):
     """Find a Scene Viewer pane tab by name, or the first one available.
 
@@ -803,12 +958,15 @@ def _find_scene_viewer(pane_name: str = None):
         RuntimeError: If no Scene Viewer is found.
         ValueError: If the named pane is not a Scene Viewer.
     """
+    require_ui(
+        "find a Scene Viewer",
+        alternative="Geometry can still be inspected with get_geometry_info and sample_geometry.",
+    )
     if pane_name is not None:
         pane_tab = _find_pane_by_name(pane_name)
         if pane_tab.type() != hou.paneTabType.SceneViewer:
             raise ValueError(
-                f"Pane '{pane_name}' is a {pane_tab.type().name()}, "
-                f"not a Scene Viewer."
+                f"Pane '{pane_name}' is a {pane_tab.type().name()}, not a Scene Viewer."
             )
         return pane_tab
 
@@ -831,18 +989,17 @@ def _find_pane_by_name(pane_name: str):
     Raises:
         ValueError: If no pane with the given name exists.
     """
+    require_ui(f"find the pane {pane_name!r}")
     for pane_tab in hou.ui.paneTabs():
         if pane_tab.name() == pane_name:
             return pane_tab
 
     available = [pt.name() for pt in hou.ui.paneTabs()]
-    raise ValueError(
-        f"Pane tab not found: '{pane_name}'. "
-        f"Available panes: {available}"
-    )
+    raise ValueError(f"Pane tab not found: '{pane_name}'. Available panes: {available}")
 
 
 ###### viewport.log_status
+
 
 def log_status(message: str, severity: str = "message") -> dict:
     """Display a status message in Houdini's status bar.
@@ -884,3 +1041,56 @@ register_handler("viewport.set_current_network", set_current_network)
 register_handler("viewport.get_current_network_path", get_current_network_path)
 register_handler("viewport.find_error_nodes", find_error_nodes)
 register_handler("viewport.log_status", log_status)
+
+
+###### viewport.set_viewer_context
+
+
+def set_viewer_context(
+    network_path: str,
+    current_node: str = None,
+    pane_name: str = None,
+) -> dict:
+    """Point the Scene Viewer at a network, and optionally a node within it.
+
+    set_current_network moves the network EDITOR. This moves the VIEWER, which is
+    a different pane and the one that decides whether a scene graph view exists at
+    all. Without it there was no way to enter Solaris, so no way to preview a USD
+    stage or set a Hydra delegate: a recorded session burned several
+    execute_python calls on exactly this, and even this project's own GUI checks
+    had to reach for Python.
+
+    Args:
+        network_path: Network for the viewer to display, e.g. "/stage".
+        current_node: Optional node inside it to make current, which is what
+            selects the stage a Solaris viewport shows.
+        pane_name: Optional pane tab name.
+    """
+    network = hou.node(network_path)
+    if network is None:
+        raise ValueError(f"Network not found: {network_path}")
+
+    scene_viewer = _find_scene_viewer(pane_name)
+    scene_viewer.setPwd(network)
+
+    if current_node is not None:
+        node = hou.node(current_node)
+        if node is None:
+            raise ValueError(f"Node not found: {current_node}")
+        scene_viewer.setCurrentNode(node)
+
+    result = {
+        "success": True,
+        "network_path": scene_viewer.pwd().path(),
+        "pane_name": scene_viewer.name(),
+        # Whether Hydra delegates apply here, which is the question the caller is
+        # usually really asking.
+        "is_scene_graph_view": _is_scene_graph_view(scene_viewer),
+    }
+    with contextlib.suppress(Exception):
+        current = scene_viewer.currentNode()
+        result["current_node"] = current.path() if current else None
+    return result
+
+
+register_handler("viewport.set_viewer_context", set_viewer_context)
