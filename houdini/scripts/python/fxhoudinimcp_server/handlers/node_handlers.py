@@ -147,13 +147,13 @@ def rename_node(node_path: str, new_name: str) -> dict:
 # downstream tools (bulk_rename_nodes, the houdini-cleanup skill prompt) can
 # pattern-match without hard-coding strings in multiple places.
 _CLASSIFY_REASONS = (
-    "ok",                          # safe to rename
-    "node_not_found",              # path did not resolve to any node
-    "is_root_or_manager",          # root "/" or top-level manager (/obj, /out, /stage, ...)
-    "is_container_hda_wrapper",    # asset definition exists AND its type allows children (Rule 2)
-    "inside_hda_contents",         # any ancestor is a container HDA wrapper (Rule 3)
-    "inside_locked_hda",           # hou.OpNode.isInsideLockedHDA() == True (locked-asset interior)
-    "not_editable",                # hou.Node.isEditable() == False (catch-all engine signal)
+    "ok",  # safe to rename
+    "node_not_found",  # path did not resolve to any node
+    "is_root_or_manager",  # root "/" or top-level manager (/obj, /out, /stage, ...)
+    "is_container_hda_wrapper",  # asset definition exists AND its type allows children (Rule 2)
+    "inside_hda_contents",  # any ancestor is a container HDA wrapper (Rule 3)
+    "inside_locked_hda",  # hou.OpNode.isInsideLockedHDA() == True (locked-asset interior)
+    "not_editable",  # hou.Node.isEditable() == False (catch-all engine signal)
 )
 
 
@@ -545,14 +545,16 @@ def _scan_cascade_references(
                 m = pat.search(haystack)
                 if not m:
                     continue
-                warnings.append({
-                    "referrer_path": node_path,
-                    "param": parm.name(),
-                    "matched_in": haystack_label,
-                    "matched_text": m.group(0),
-                    "old_name": old_name,
-                    "new_name": rename_map.get(old_name),
-                })
+                warnings.append(
+                    {
+                        "referrer_path": node_path,
+                        "param": parm.name(),
+                        "matched_in": haystack_label,
+                        "matched_text": m.group(0),
+                        "old_name": old_name,
+                        "new_name": rename_map.get(old_name),
+                    }
+                )
                 # One warning per (parm, old_name) pair is enough.
                 break
 
@@ -688,11 +690,13 @@ def bulk_rename_nodes(
             continue
         node_path, new_name = validated
         if node_path in seen_paths:
-            blocked.append({
-                "node_path": node_path,
-                "reason": "duplicate_entry",
-                "details": {"node_path": node_path},
-            })
+            blocked.append(
+                {
+                    "node_path": node_path,
+                    "reason": "duplicate_entry",
+                    "details": {"node_path": node_path},
+                }
+            )
             continue
         seen_paths.add(node_path)
         normalised.append({"node_path": node_path, "new_name": new_name})
@@ -702,30 +706,36 @@ def bulk_rename_nodes(
     for entry in normalised:
         node = hou.node(entry["node_path"])
         if node is None:
-            blocked.append({
-                "node_path": entry["node_path"],
-                "reason": "node_not_found",
-                "details": {},
-            })
+            blocked.append(
+                {
+                    "node_path": entry["node_path"],
+                    "reason": "node_not_found",
+                    "details": {},
+                }
+            )
             continue
         try:
             old_name = node.name()
             parent = node.parent()
             parent_path = parent.path() if parent is not None else None
         except (hou.OperationFailed, hou.ObjectWasDeleted, AttributeError) as exc:
-            blocked.append({
-                "node_path": entry["node_path"],
-                "reason": "node_not_found",
-                "details": {"error": str(exc)},
-            })
+            blocked.append(
+                {
+                    "node_path": entry["node_path"],
+                    "reason": "node_not_found",
+                    "details": {"error": str(exc)},
+                }
+            )
             continue
-        resolved.append({
-            "node": node,
-            "node_path": entry["node_path"],
-            "old_name": old_name,
-            "new_name": entry["new_name"],
-            "parent_path": parent_path,
-        })
+        resolved.append(
+            {
+                "node": node,
+                "node_path": entry["node_path"],
+                "old_name": old_name,
+                "new_name": entry["new_name"],
+                "parent_path": parent_path,
+            }
+        )
 
     # -------- Mixed-parent guard --------
     # Cleanup must touch one network at a time. If the resolved entries
@@ -735,30 +745,34 @@ def bulk_rename_nodes(
     # cleanup batch is, not a safety rule about what's renameable.
     distinct_parents = sorted({r["parent_path"] for r in resolved if r["parent_path"] is not None})
     if len(distinct_parents) > 1:
-        blocked.append({
-            "node_path": None,
-            "reason": "mixed_parents",
-            "details": {
-                "parent_paths": distinct_parents,
-                "message": (
-                    "Cleanup must target a single network. The plan's nodes "
-                    "live under multiple parents; ask the user to narrow the "
-                    "selection to one network and try again."
-                ),
-            },
-        })
+        blocked.append(
+            {
+                "node_path": None,
+                "reason": "mixed_parents",
+                "details": {
+                    "parent_paths": distinct_parents,
+                    "message": (
+                        "Cleanup must target a single network. The plan's nodes "
+                        "live under multiple parents; ask the user to narrow the "
+                        "selection to one network and try again."
+                    ),
+                },
+            }
+        )
         # Short-circuit: do not run further pre-flight passes — the agent
         # needs to fix the input before anything else matters.
         results = []
         for r in resolved:
-            results.append({
-                "node_path": r["node_path"],
-                "old_name": r["old_name"],
-                "new_name_requested": r["new_name"],
-                "new_name_actual": None,
-                "planned": True,
-                "succeeded": False,
-            })
+            results.append(
+                {
+                    "node_path": r["node_path"],
+                    "old_name": r["old_name"],
+                    "new_name_requested": r["new_name"],
+                    "new_name_actual": None,
+                    "planned": True,
+                    "succeeded": False,
+                }
+            )
         return {
             "applied": False,
             "dry_run": bool(dry_run),
@@ -786,16 +800,18 @@ def bulk_rename_nodes(
                 # Silent pass-through: do NOT add to blocked, do NOT add to
                 # any warning list. The user picked it; honour the pick.
                 continue
-            blocked.append({
-                "node_path": r["node_path"],
-                "reason": reason,
-                "details": {
-                    "containing_asset_path": verdict.get("containing_asset_path"),
-                    "containing_asset_type": verdict.get("containing_asset_type"),
-                    "is_editable": verdict.get("is_editable"),
-                    "is_inside_locked_hda": verdict.get("is_inside_locked_hda"),
-                },
-            })
+            blocked.append(
+                {
+                    "node_path": r["node_path"],
+                    "reason": reason,
+                    "details": {
+                        "containing_asset_path": verdict.get("containing_asset_path"),
+                        "containing_asset_type": verdict.get("containing_asset_type"),
+                        "is_editable": verdict.get("is_editable"),
+                        "is_inside_locked_hda": verdict.get("is_inside_locked_hda"),
+                    },
+                }
+            )
         # Drop blocked entries from the executable set so the collision
         # check below operates on what would actually run.
         blocked_paths = {b.get("node_path") for b in blocked if b.get("node_path")}
@@ -810,15 +826,17 @@ def bulk_rename_nodes(
     for (parent_path, new_name), paths in by_parent_target.items():
         if len(paths) > 1:
             for p in paths:
-                blocked.append({
-                    "node_path": p,
-                    "reason": "intra_batch_collision",
-                    "details": {
-                        "parent_path": parent_path,
-                        "new_name": new_name,
-                        "conflicts_with": [x for x in paths if x != p],
-                    },
-                })
+                blocked.append(
+                    {
+                        "node_path": p,
+                        "reason": "intra_batch_collision",
+                        "details": {
+                            "parent_path": parent_path,
+                            "new_name": new_name,
+                            "conflicts_with": [x for x in paths if x != p],
+                        },
+                    }
+                )
     blocked_paths = {b.get("node_path") for b in blocked if b.get("node_path")}
     resolved = [r for r in resolved if r["node_path"] not in blocked_paths]
 
@@ -839,14 +857,16 @@ def bulk_rename_nodes(
             # The colliding sibling is also being renamed away in this batch,
             # so the placeholder phase will free the name in time.
             continue
-        blocked.append({
-            "node_path": r["node_path"],
-            "reason": "external_collision",
-            "details": {
-                "new_name": r["new_name"],
-                "existing_sibling_path": existing.path(),
-            },
-        })
+        blocked.append(
+            {
+                "node_path": r["node_path"],
+                "reason": "external_collision",
+                "details": {
+                    "new_name": r["new_name"],
+                    "existing_sibling_path": existing.path(),
+                },
+            }
+        )
     blocked_paths = {b.get("node_path") for b in blocked if b.get("node_path")}
     resolved = [r for r in resolved if r["node_path"] not in blocked_paths]
 
@@ -857,11 +877,13 @@ def bulk_rename_nodes(
         if network_scope is not None:
             scope_node = hou.node(network_scope)
             if scope_node is None:
-                blocked.append({
-                    "node_path": None,
-                    "reason": "network_scope_not_found",
-                    "details": {"network_scope": network_scope},
-                })
+                blocked.append(
+                    {
+                        "node_path": None,
+                        "reason": "network_scope_not_found",
+                        "details": {"network_scope": network_scope},
+                    }
+                )
         else:
             common = _common_parent_path([r["node_path"] for r in resolved])
             scope_node = hou.node(common) if common else hou.node("/")
@@ -883,14 +905,16 @@ def bulk_rename_nodes(
     if blocked or dry_run:
         results = []
         for r in resolved:
-            results.append({
-                "node_path": r["node_path"],
-                "old_name": r["old_name"],
-                "new_name_requested": r["new_name"],
-                "new_name_actual": None,
-                "planned": True,
-                "succeeded": False,
-            })
+            results.append(
+                {
+                    "node_path": r["node_path"],
+                    "old_name": r["old_name"],
+                    "new_name_requested": r["new_name"],
+                    "new_name_actual": None,
+                    "planned": True,
+                    "succeeded": False,
+                }
+            )
         return {
             "applied": False,
             "dry_run": bool(dry_run),
@@ -939,14 +963,16 @@ def bulk_rename_nodes(
                     failing_target=r["new_name"],
                     underlying=str(exc),
                 ) from exc
-            final_results.append({
-                "node_path": r["node_path"],
-                "old_name": r["old_name"],
-                "new_name_requested": r["new_name"],
-                "new_name_actual": r["node"].name(),
-                "planned": False,
-                "succeeded": True,
-            })
+            final_results.append(
+                {
+                    "node_path": r["node_path"],
+                    "old_name": r["old_name"],
+                    "new_name_requested": r["new_name"],
+                    "new_name_actual": r["node"].name(),
+                    "planned": False,
+                    "succeeded": True,
+                }
+            )
 
     except _BulkRenameError as failure:
         # Rollback: walk the placeholder_stack in reverse, restoring
@@ -961,19 +987,23 @@ def bulk_rename_nodes(
                 # don't leave the placeholder name in place.
                 try:
                     node.setName(original_name, unique_name=True)
-                    rollback_failures.append({
-                        "node_path": node.path(),
-                        "intended_name": original_name,
-                        "fallback_name": node.name(),
-                        "underlying": str(rb_exc),
-                    })
+                    rollback_failures.append(
+                        {
+                            "node_path": node.path(),
+                            "intended_name": original_name,
+                            "fallback_name": node.name(),
+                            "underlying": str(rb_exc),
+                        }
+                    )
                 except hou.OperationFailed as rb_exc2:
-                    rollback_failures.append({
-                        "node_path": node.path(),
-                        "intended_name": original_name,
-                        "fallback_name": None,
-                        "underlying": str(rb_exc2),
-                    })
+                    rollback_failures.append(
+                        {
+                            "node_path": node.path(),
+                            "intended_name": original_name,
+                            "fallback_name": None,
+                            "underlying": str(rb_exc2),
+                        }
+                    )
 
         rollback_info = {
             "completed_cleanly": len(rollback_failures) == 0,
@@ -987,14 +1017,16 @@ def bulk_rename_nodes(
         # Mark every entry as failed.
         results = []
         for r in resolved:
-            results.append({
-                "node_path": r["node_path"],
-                "old_name": r["old_name"],
-                "new_name_requested": r["new_name"],
-                "new_name_actual": None,
-                "planned": True,
-                "succeeded": False,
-            })
+            results.append(
+                {
+                    "node_path": r["node_path"],
+                    "old_name": r["old_name"],
+                    "new_name_requested": r["new_name"],
+                    "new_name_actual": None,
+                    "planned": True,
+                    "succeeded": False,
+                }
+            )
         return {
             "applied": False,
             "dry_run": False,
@@ -1023,7 +1055,9 @@ class _BulkRenameError(Exception):
     """
 
     def __init__(self, phase: str, failing_path: str, failing_target: str, underlying: str):
-        super().__init__(f"{phase} phase failed for {failing_path} -> {failing_target}: {underlying}")
+        super().__init__(
+            f"{phase} phase failed for {failing_path} -> {failing_target}: {underlying}"
+        )
         self.phase = phase
         self.failing_path = failing_path
         self.failing_target = failing_target

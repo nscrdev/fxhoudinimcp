@@ -79,6 +79,7 @@ def render_viewport(
     )
     if output_path is None:
         from fxhoudinimcp_server.handlers.viewport_handlers import _default_capture_path
+
         output_path = _default_capture_path("viewport")
 
     # Ensure the output directory exists
@@ -163,6 +164,7 @@ def render_quad_view(
     )
     if output_path is None:
         from fxhoudinimcp_server.handlers.viewport_handlers import _default_capture_path
+
         output_path = _default_capture_path("quad_view")
 
     out_dir = os.path.dirname(output_path)
@@ -589,6 +591,7 @@ def render_node_network(
 
     if output_path is None:
         from fxhoudinimcp_server.handlers.viewport_handlers import _default_capture_path
+
         output_path = _default_capture_path("node_network")
 
     out_dir = os.path.dirname(output_path)

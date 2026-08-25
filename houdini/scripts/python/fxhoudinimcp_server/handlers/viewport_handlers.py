@@ -831,6 +831,7 @@ def set_current_network(network_path: str) -> dict:
 
 ###### viewport.get_current_network_path
 
+
 def get_current_network_path() -> dict:
     """Return the network path the user currently has open in the network editor.
 
@@ -865,11 +866,13 @@ def get_current_network_path() -> dict:
             current_path = pane_path
             current_pane_name = pt.name()
         else:
-            alternates.append({
-                "pane_name": pt.name(),
-                "current_path": pane_path,
-                "is_current_tab": is_current,
-            })
+            alternates.append(
+                {
+                    "pane_name": pt.name(),
+                    "current_path": pane_path,
+                    "is_current_tab": is_current,
+                }
+            )
 
     return {
         "current_path": current_path,

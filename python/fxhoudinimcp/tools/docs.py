@@ -78,8 +78,18 @@ class _HelpPageExtractor(HTMLParser):
     """
 
     _BLOCK_TAGS = {
-        "p", "div", "section", "article", "li", "ul", "ol",
-        "pre", "table", "tr", "br", "hr",
+        "p",
+        "div",
+        "section",
+        "article",
+        "li",
+        "ul",
+        "ol",
+        "pre",
+        "table",
+        "tr",
+        "br",
+        "hr",
     }
     _HEADING_TAGS = {"h1", "h2", "h3", "h4", "h5", "h6"}
     _SKIP_TAGS = {"script", "style", "nav", "header", "footer", "aside"}
@@ -157,6 +167,7 @@ def _html_to_text(html: str) -> str:
 
 try:
     import html2text as _html2text_mod  # type: ignore[import-not-found]
+
     _HAS_HTML2TEXT = True
 except ImportError:
     _HAS_HTML2TEXT = False
@@ -189,6 +200,7 @@ def _render(html: str, format: str) -> str:
 
 
 ###### HTTP fetch with port-refresh fallback
+
 
 async def _fetch(ctx: Context, path: str) -> str:
     """GET ``path`` from the help server and return the raw HTML body.
@@ -244,15 +256,18 @@ def _parse_search_results(html: str, limit: int) -> list[dict]:
         if len(hits) >= limit:
             break
         href, title_html, desc_html = match.group(1), match.group(2), match.group(3)
-        hits.append({
-            "path": href,
-            "title": _strip_tags(title_html) or href,
-            "desc": _strip_tags(desc_html) if desc_html else "",
-        })
+        hits.append(
+            {
+                "path": href,
+                "title": _strip_tags(title_html) or href,
+                "desc": _strip_tags(desc_html) if desc_html else "",
+            }
+        )
     return hits
 
 
 ###### Tools
+
 
 @mcp.tool()
 async def get_node_docs(
