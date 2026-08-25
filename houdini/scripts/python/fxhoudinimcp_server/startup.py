@@ -105,13 +105,30 @@ def start(port: int | None = None) -> None:
 
     def _verify() -> None:
         global _server_started
+
+        if run_error is not None:
+            _server_started = False
+            print(
+                "[fxhoudinimcp] Startup FAILED: hwebserver.run() raised "
+                f"on port {_port}: {run_error}"
+            )
+            return
+
+        # mcp.health runs on Houdini's main thread, which can stay busy for
+        # a long time after startup (package loads, desktop build, scene
+        # open). A short deadline here produces false "Startup FAILED"
+        # reports, so after the initial fast window keep polling slowly and
+        # only give up after several minutes of total silence.
         health = _wait_for_current_process_health(_port, timeout_seconds=10.0)
+        slow_deadline = time.time() + 300.0
+        while health is None and time.time() < slow_deadline:
+            time.sleep(2.0)
+            health = _query_health(_port)
         if health is None:
             _server_started = False
-            detail = f": {run_error}" if run_error is not None else ""
             print(
                 "[fxhoudinimcp] Startup FAILED: hwebserver did not answer "
-                f"mcp.health on port {_port}{detail}"
+                f"mcp.health on port {_port} within 5 minutes"
             )
             return
 
