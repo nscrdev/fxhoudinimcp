@@ -12,16 +12,16 @@ Skills are a Claude Code-only feature — they are NOT part of this MCP package 
 
 | MCP prompt (`markdown/`)  | Mirrored skill (`~/.claude/skills/`)      | Triggers on                                                            |
 |---------------------------|-------------------------------------------|------------------------------------------------------------------------|
-| `procedural_modeling.md`  | `houdini-procedural-modeling/SKILL.md`    | build / scatter / extrude / fracture geometry                          |
-| `simulation_setup.md`     | `houdini-simulation/SKILL.md`             | pyro, FLIP, RBD, Vellum, POP, crowds, "make X explode"                 |
-| `usd_scene_assembly.md`   | `houdini-usd-solaris/SKILL.md`            | /stage, LOPs, Karma lookdev, materiallibrary, lighting rigs            |
-| `debug_scene.md`          | `houdini-debug-scene/SKILL.md`            | "broken", "find errors", "nothing showing", "sim exploding"            |
-| `hda_development.md`      | `houdini-hda/SKILL.md`                    | "turn this into an HDA", "promote parameters"                          |
-| `pdg_pipeline.md`         | `houdini-pdg/SKILL.md`                    | /tasks, wedge, batch render, ROP Fetch, FFmpeg encode                  |
+| `workflows/model.md`      | `houdini-procedural-modeling/SKILL.md`    | build / scatter / extrude / fracture geometry                          |
+| `workflows/dyno.md`       | `houdini-simulation/SKILL.md`             | pyro, FLIP, RBD, Vellum, POP, crowds, "make X explode"                 |
+| `workflows/solaris.md`    | `houdini-usd-solaris/SKILL.md`            | /stage, LOPs, Karma lookdev, materiallibrary, lighting rigs            |
+| `workflows/troubleshooting.md` | `houdini-debug-scene/SKILL.md`            | "broken", "find errors", "nothing showing", "sim exploding"            |
+| `workflows/assets.md`     | `houdini-hda/SKILL.md`                    | "turn this into an HDA", "promote parameters"                          |
+| `workflows/tops.md`       | `houdini-pdg/SKILL.md`                    | /tasks, wedge, batch render, ROP Fetch, FFmpeg encode                  |
 | `omniverse_prep.md`       | `houdini-omniverse-prep/SKILL.md`         | Omniverse, USD Composer/Explorer, Isaac Sim, "Cannot find node" / "Ill-formed SdfPath" errors, dual-surface, orphan displacement |
 | `houdini_cleanup.md`      | `houdini-cleanup/SKILL.md`                | Houdini cleanup, rename nodes, descriptive names, handoff-ready graph |
-| `network_housekeeping.md` | *(inlined into each skill)*               | shared snippet — skills have no interpolation, so it's copy-pasted in  |
-| `server_instructions.md`  | *(not mirrored)*                          | auto-loaded on every MCP session as the server's system instructions   |
+| `shared/housekeeping.md`  | *(inlined into each skill)*               | shared snippet — skills have no interpolation, so it's copy-pasted in  |
+| `instructions/server_instructions.md` | *(not mirrored)*                          | auto-loaded on every MCP session as the server's system instructions   |
 
 ### Sync rules
 

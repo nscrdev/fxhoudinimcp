@@ -2,7 +2,7 @@
 
 ## Overview
 
-fxhoudinimcp exposes **179 tools** across **22 categories**, covering every major Houdini context.
+fxhoudinimcp exposes **195 tools** across **24 categories**, covering every major Houdini context.
 
 Once connected, your AI assistant can:
 

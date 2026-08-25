@@ -72,7 +72,7 @@ A comprehensive [MCP](https://modelcontextprotocol.io/) (Model Context Protocol)
 | **Graph Intelligence** | 6 | Atomic validated network building, network verification, node doc cards, cook profiling, frame-range cooking with per-frame evidence, cook status |
 | **Documentation** | 2 | Full-text search + page retrieval over Houdini's own shipped manual (version-exact) |
 | **Scene Management** | 7 | Open, save, import/export, scene info |
-| **Node Operations** | 17 | Create, delete, copy, connect, layout, flags |
+| **Node Operations** | 19 | Create, delete, copy, connect, layout, flags, safe-rename classifier, bulk rename |
 | **Parameters** | 12 | Get/set values in bulk, expressions, keyframes, spare parameters |
 | **Geometry (SOPs)** | 14 | Points, prims, attributes, attribute statistics, volume inspection, groups, sampling, nearest-point search |
 | **LOPs/USD** | 18 | Stage inspection, prims, layers, composition, variants, lighting |
@@ -84,14 +84,14 @@ A comprehensive [MCP](https://modelcontextprotocol.io/) (Model Context Protocol)
 | **Rendering** | 9 | Viewport capture, render nodes, settings, render launch |
 | **VEX** | 5 | Create/edit wrangles, validate VEX code |
 | **Code Execution** | 4 | Python, HScript, expressions, env variables |
-| **Viewport/UI** | 14 | Pane management, viewer context, verified camera and renderer state, screenshots, error detection |
+| **Viewport/UI** | 15 | Pane management, viewer context, verified camera and renderer state, screenshots, error detection |
 | **Scene Context** | 8 | Network overview, cook chain, selection, scene summary, error analysis |
 | **Workflows** | 8 | One-call Pyro/RBD/FLIP/Vellum setup, SOP chains, render config |
 | **Materials** | 5 | List, inspect, create materials and shader networks |
 | **CHOPs** | 4 | Channel data, CHOP nodes, export channels to parameters |
 | **Cache** | 4 | List, inspect, clear, write file caches |
 | **Takes** | 4 | List, create, switch takes with parameter overrides |
-| **Documentation** | 4 | Fetch node/VEX/page docs and full-text search from Houdini's local help server |
+| **Local Help Server** | 4 | Fetch node/VEX/page docs and full-text search from Houdini's live local help server (fork addition) |
 | **Shelf Tools** | 3 | Find, read and run Houdini's own shelf tools (setups build_network cannot produce) |
 
 <!-- ARCHITECTURE -->
@@ -155,7 +155,7 @@ both and one upgrade moves them together.
 
 - **Houdini** 20.5+ (integration suite green on 20.5.278, 20.5.487, 20.5.613, 20.5.654, 21.0.440 and 22.0.368)
 - **Python** 3.10+, separate from the one inside Houdini
-- **MCP SDK** (`mcp` package) 1.8+, installed for you as a dependency
+- **MCP SDK** (`mcp` package) 1.14+ (2.x supported), installed for you as a dependency
 
 ### Install
 
